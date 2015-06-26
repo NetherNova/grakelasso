@@ -23,5 +23,5 @@ y_sparse = data.ix[index_sparse, response]
 
 # Evaluate GraKeLasso
 klasso = KLasso(kernel_lap.as_matrix(), alpha)
-mse = klasso.cross_val(X_sparse, y_sparse, 10, 10000, lambd)
-print("MSE: ", mse)
+rmse = klasso.cross_val(X_sparse, y_sparse, 10, 10000, lambd)
+print("MSE: ", rmse)

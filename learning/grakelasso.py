@@ -203,11 +203,11 @@ class ModelManager(object):
         self.data = None
         self.kernel_laplacian = None
 
-    def load_data(self, files):
+    def load_data(self, files, sep='\t'):
         dfs = []
         for f in files:
             fp = open(f, "rb")
-            data = pd.read_csv(fp, sep='\t')
+            data = pd.read_csv(fp, sep=sep)
             dfs.append(data.loc[:2100, :])
         self.data = pd.concat(dfs, axis=1)
         self.data.rename(columns=lambda x: x.strip())
