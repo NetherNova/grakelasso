@@ -13,7 +13,7 @@ TOLERANCE = 0.001
 
 class KLasso(object):
     """
-    A Lasso regression with kernel regularization
+    A Lasso regression with laplacian regularization
     :param kernel: symmetric positive semi-definite
     :param alpha: overall regularization parameter
     """
