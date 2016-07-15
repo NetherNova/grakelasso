@@ -252,7 +252,7 @@ def get_first_forward(prev_dfs, right_most_path, hist, pm_forward, dfs_codes, db
 	for e in last_node.edges:
 		to_node = g.nodes[e.to]
 		
-		if e.to in hist.has_node or to_node.label < min_label:
+		if e.to in hist.has_node or to_node.label < min_label:	# if this node has already been explored or is further up in the min_label search (reversed order as initial starting) --> continue
 			continue
 
 		to_id = dfs_codes[right_most_path[0]].to
@@ -524,10 +524,29 @@ def show_subgraph(dfs_codes, nsupport, mapper):
 	__subgraph_count += 1
 	g.gprint(nsupport, mapper)
 
+
+#
+# e: uri of entity
+# pattern: graph representation of pattern
+#
+def check_entity_in_pattern(e, pattern):
+	global __entity_dict
+	try:
+		val = __entity_dict[e]
+	except KeyError:
+		return False
+
+	for s,o,p in pattern:
+		pass
+	return True
+
+
+
+
 # 
 # Generate initial edges and start the mining process
 #
-def project(database, frequent_nodes, minsup, freq_labels, length, mapper, labels, model, constraints):
+def project(database, frequent_nodes, minsup, freq_labels, length, mapper, labels, model, constraints, dependency_matrix, entity_dict, product_map):
 	global __subgraph_count
 	global __positive_index
 	global __n_pos
@@ -539,6 +558,14 @@ def project(database, frequent_nodes, minsup, freq_labels, length, mapper, label
 	global __cl_constraints
 	global __ml_constraints
 	global __negative_index
+	global __dependency_matrix
+	global __entity_dict
+
+
+
+
+	__entity_dict = entity_dict
+	__dependency_matrix = dependency_matrix	# |entity| x |entity| 0-1 matrix
 
 	__cl_constraints = constraints[0]
 	__ml_constraints = constraints[1]
@@ -568,6 +595,8 @@ def project(database, frequent_nodes, minsup, freq_labels, length, mapper, label
 				W[i, j] = 1.0 / A
 			else:
 				W[i, j] = -1.0 / B
+
+
 	D = np.zeros((__n_graphs, __n_graphs))
 	for i in xrange(0, __n_graphs):
 		D[i,i] = sum(W[i, ])
@@ -607,19 +636,34 @@ def project(database, frequent_nodes, minsup, freq_labels, length, mapper, label
 	#	print pm
 	#print '----'
 	# Start Subgraph Mining
-	for pm in reversed(sorted(projection_map, key=dfs_code_compare)):
+	for pm in reversed(sorted(projection_map, key=dfs_code_compare)):	# sorted by highest fromnode label (order is important)
 		# print pm
 		# Partial pruning like apriori
 		if len(projection_map[pm]) < minsup: # number of graphs, this initial pattern occurs
 			continue
 		
-		dfs_codes.append(dfs_code(0,1,pm[2],pm[3],pm[4]))
+		dfs_codes.append(dfs_code(0,1,pm[2],pm[3],pm[4]))	# initial pattern for this projection is always local 0, 1)
 
 		dfs_codes = mine_subgraph(database, projection_map[pm], 
 							dfs_codes, minsup, length, 0, mapper, model)
 
-		dfs_codes.pop()
+		dfs_codes.pop()	# dfs_codes is a list of all projections for this initial pattern
 
+	if product_map is not None:
+		num_features = len(__dataset[0])
+		p1 = np.zeros(num_features)
+		p2 = np.zeros(num_features)
+		p3 = np.zeros(num_features)
+		for i in xrange(num_features):
+			if product_map[i] == 1:
+				p1[i] = 1
+			if product_map[i] == 2:
+				p2[i] = 1
+			if product_map[i] == 3:
+				p3[i] = 1
+		__pattern_set.append(p1)
+		__pattern_set.append(p2)
+		__pattern_set.append(p3)
 	return __dataset, __pattern_set
 
 # 
@@ -643,7 +687,7 @@ def mine_subgraph(database, projection, dfs_codes, minsup, length, threshold, ma
 	# show_subgraph(dfs_codes, nsupport, mapper)
 
 	right_most_path = build_right_most_path(dfs_codes)
-	min_label = dfs_codes[0].from_label
+	min_label = dfs_codes[0].from_label	# dfs_codes[0] is the starting pattern of this search (root), it has the minimum node label (because reversed sorted before starting search)
 	
 	pm_backward, pm_forward = genumerate(projection, right_most_path, dfs_codes, min_label, database, mapper)
 	#print pm_backward.keys()
@@ -758,6 +802,10 @@ def get_min_greedy():
 	#	__dataset.pop(min_index)
 	#	__pattern_set.pop(min_index)
 	return min_index, min_freq
+
+def variance(pair):
+	global __dataset
+	__dataset[pair[0]]
 
 def evaluate_and_prune(dfs_codes, mapper, projection, threshold, length, model):
 	global __pattern_set

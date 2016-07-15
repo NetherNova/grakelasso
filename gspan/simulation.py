@@ -1,7 +1,8 @@
 __author__ = 'martin'
 
-from rdflib import URIRef, ConjunctiveGraph, RDF, Literal
+from rdflib import URIRef, ConjunctiveGraph, RDF, Literal, BNode
 import numpy as np
+import graph
 
 HAS_PART = URIRef("http://www.siemens.com/ontology/demonstrator#hasPart")
 HAS_PROPERTY = URIRef("http://www.siemens.com/ontology/demonstrator#hasProperty")
@@ -11,6 +12,7 @@ USED_EQUIPMENT = URIRef("http://www.siemens.com/ontology/demonstrator#usedEquipm
 EXECUTED_OPERATION = URIRef("http://www.siemens.com/ontology/demonstrator#executedOperation")
 MADE_OF = URIRef("http://www.siemens.com/ontology/demonstrator#isMadeOf")
 ON_PART = URIRef("http://www.siemens.com/ontology/demonstrator#onPart")
+LINK = URIRef("http://www.siemens.com/ontology/demonstrator#link")
 
 # Parts
 PE_BIG = URIRef("http://www.siemens.com/ontology/demonstrator#PE-Handle-Big")
@@ -58,8 +60,14 @@ op6 = URIRef("http://www.siemens.com/ontology/demonstrator#Operation/Assembly2")
 op7 = URIRef("http://www.siemens.com/ontology/demonstrator#Operation/Finishing")
 process = URIRef("http://www.siemens.com/ontology/demonstrator#Process")
 
-# common cause op4
-# special causes
+# variables
+
+def generateOperations(product, quality):
+    # discretize attributes / anomaly / events as boolean attributes
+    # machine and bOm connection to ontology
+    # temporal graphs
+    # instances more similar to each other the more similar their graph connections are
+    pass
 
 
 def generateProcess(product, quality):
@@ -93,8 +101,12 @@ def generateProcess(product, quality):
             g.add((op4, ON_PART, shaft))
             g.add((SCREW_DRIVER, MADE_OF, PE_BIG))
             g.add((PE_BIG, MADE_OF, shaft))
-            g.add((shaft, MADE_OF, PIN1))
-            g.add((shaft, MADE_OF, PIN2))
+            blank_pin1 = BNode()
+            g.add((shaft, MADE_OF, blank_pin1))
+            g.add((blank_pin1, LINK, PIN1))
+            blank_pin2 = BNode()
+            g.add((shaft, MADE_OF, blank_pin2))
+            g.add((blank_pin2, LINK , PIN1))
             if np.random.random() <= 0.3:
                 g.add((op4, HAS_FOLLOWER, op5))
                 g.add((op5, HAS_FOLLOWER, op7))
@@ -128,8 +140,12 @@ def generateProcess(product, quality):
             g.add((op4, ON_PART, shaft))
             g.add((SCREW_DRIVER, MADE_OF, PE_BIG))
             g.add((PE_BIG, MADE_OF, shaft))
-            g.add((shaft, MADE_OF, PIN1))
-            g.add((shaft, MADE_OF, PIN2))
+            blank_pin1 = BNode()
+            g.add((shaft, MADE_OF, blank_pin1))
+            g.add((blank_pin1, LINK, PIN1))
+            blank_pin2 = BNode()
+            g.add((shaft, MADE_OF, blank_pin2))
+            g.add((blank_pin2, LINK , PIN1))
             if np.random.random() <= 0.3:
                 g.add((op4, HAS_FOLLOWER, op5))
                 g.add((op5, HAS_FOLLOWER, op7))
@@ -250,8 +266,12 @@ def generateProcess(product, quality):
             g.add((op4, ON_PART, shaft))
             g.add((SCREW_DRIVER, MADE_OF, PE_BIG))
             g.add((PE_BIG, MADE_OF, shaft))
-            g.add((shaft, MADE_OF, PIN1))
-            g.add((shaft, MADE_OF, PIN2))
+            blank_pin1 = BNode()
+            g.add((shaft, MADE_OF, blank_pin1))
+            g.add((blank_pin1, LINK, PIN1))
+            blank_pin2 = BNode()
+            g.add((shaft, MADE_OF, blank_pin2))
+            g.add((blank_pin2, LINK , PIN1))
             if np.random.random() <= 0.5:
                 g.add((op4, HAS_FOLLOWER, op5))
                 g.add((op5, HAS_FOLLOWER, op7))
@@ -307,12 +327,13 @@ def generateProcess(product, quality):
 
 def execute(num_processes):
     pos_labels = []
+    product_map = dict()
     for i in xrange(0, num_processes):
         product = np.random.randint(1,4)
         quality = np.random.random() < 0.8
-        print(product, quality)
         g = generateProcess(product, quality)
+        product_map[i] = product
         if quality:
             pos_labels.append(i)
         g.serialize(open("D:\\Dissertation\\Data Sets\\Manufacturing\\execution_"+str(i)+"_.rdf", "w"))
-    return pos_labels
+    return pos_labels, product_map

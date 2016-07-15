@@ -1,6 +1,6 @@
 __author__ = 'martin'
 
-from learning.grakelasso import KLasso, ModelManager
+from learning.grakelasso import GraKeLasso, ModelManager
 import numpy as np
 
 lambd = 0.1
@@ -18,10 +18,10 @@ index_sparse = np.ones(num_examples, dtype=bool)
 index_sparse = np.concatenate((index_sparse, np.zeros(mm.num_examples() - num_examples - 1, dtype=bool)))
 np.random.shuffle(index_sparse)
 
-X_sparse = mm.get_all_features_except_response(response).ix[index_sparse, :]
+X_sparse = mm.get_all_features_except_response(response, index_sparse)
 y_sparse = data.ix[index_sparse, response]
 
 # Evaluate GraKeLasso
-klasso = KLasso(kernel_lap.as_matrix(), alpha)
-rmse = klasso.cross_val(X_sparse, y_sparse, 10, 10000, lambd)
-print("MSE: ", rmse)
+klasso = GraKeLasso(kernel_lap.as_matrix(), alpha)
+rmse, avg_theta = klasso.cross_val(X_sparse, y_sparse, 10, 10000, lambd)
+print("MSE and Coefficient Reduction ", rmse, avg_theta)

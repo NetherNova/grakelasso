@@ -5,13 +5,13 @@ import numpy as np
 import logging
 import pandas as pd
 from sklearn.linear_model.base import center_data
+from rdflib import Graph, RDF, URIRef
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.WARNING)
 
 TOLERANCE = 0.001
 
-
-class KLasso(object):
+class GraKeLasso(object):
     """
     A Lasso regression with laplacian regularization
     :param kernel: symmetric positive semi-definite
@@ -36,7 +36,7 @@ class KLasso(object):
         best_lambda = 0
         error = np.inf
         for lambda_cur in np.arange(lambda_range[0], lambda_range[1], 0.1):
-                avg_error = self.cross_val(X, y, n_fold, n_iter, lambda_cur, model=model)
+                avg_error,_  = self.cross_val(X, y, n_fold, n_iter, lambda_cur, model=model)
                 if avg_error < error:
                     error = avg_error
                     best_lambda = lambda_cur
@@ -51,7 +51,7 @@ class KLasso(object):
         :param n_fold: how many cross-val runs
         :param n_iter: training iterations
         :param lambd: reguralization parameter
-        :param model: learning model
+        :param model: learning model *none* means current GraKeLasso
         :return:
         """
         X, y, X_mean, y_mean, X_std = center_data(X, y, fit_intercept=True, normalize=True)
@@ -59,7 +59,8 @@ class KLasso(object):
         n_rows = np.floor(X.shape[0] * train_prct)
         index = np.ones(n_rows, dtype=bool)
         index = np.concatenate((index, np.zeros(X.shape[0] - n_rows - 1, dtype=bool)))
-        avg_error = 0
+        avg_error = 0.0
+        avg_theta = 0.0
         for i in xrange(n_fold):
             np.random.shuffle(index)
             new_index = 1-index
@@ -81,8 +82,10 @@ class KLasso(object):
             errors = y_temp - predict
             error = np.sqrt(1/(1.0*num_test_examples)*sum(np.square(errors)))
             avg_error += error
+            avg_theta += 1.0 * (len([c for c in theta if c != 0])) / (1.0 * len(theta))
+        avg_theta = avg_theta / (1.0 * n_fold)
         avg_error = avg_error / (1.0 * n_fold)
-        return avg_error
+        return avg_error, avg_theta
 
     def train_standard(self, X, y, lambd, n_iter):
         """
@@ -196,12 +199,34 @@ class ModelManager(object):
 
     def __init__(self):
         self.featureIndex = dict()
+        self.reverseFeatureIndex = dict()
         self.data = None
-        self.kernel_laplacian = None
+        self.ontology = Graph()
+        self.namespace = None
 
     def __del__(self):
         self.data = None
-        self.kernel_laplacian = None
+
+    def load_ontology(self, ontology_files, namespace):
+        self.namespace = namespace
+        for file in ontology_files:
+            self.ontology.load(file)
+
+    def isExcludedFeature(self, feature):
+        result = self.ontology.triples((URIRef(feature, base=self.namespace), RDF.type,
+                                        URIRef("ExcludedFeature", base=self.namespace)))
+        if result is None:
+            return False
+        else:
+            return True
+
+    def isMandatoryFeature(self, feature):
+        result = self.ontology.triples((URIRef(feature, base=self.namespace), RDF.type,
+                                        URIRef("MandatoryFeature", base=self.namespace)))
+        if result is None:
+            return False
+        else:
+            return True
 
     def load_data(self, files, sep='\t'):
         dfs = []
@@ -213,6 +238,7 @@ class ModelManager(object):
         self.data.rename(columns=lambda x: x.strip())
         headers = list(self.data.columns.values)
         for i, h in enumerate(headers):
+            self.reverseFeatureIndex[i] = h
             self.featureIndex[h] = i
         logging.info("Loaded data with headers %s", headers)
 
@@ -222,20 +248,30 @@ class ModelManager(object):
         :param: file to be opened
         """
         fp = open(file, "rb")
-        self.kernel_laplacian = pd.read_csv(fp, sep=',')
-        return self.kernel_laplacian
+        kernel_laplacian = pd.read_csv(fp, sep=',')
+        return kernel_laplacian
 
-    def get_all_features_except_response(self, response):
+    def get_all_features_except_response(self, response, instance_index, laplacian=None):
         logging.info("Getting all features, except: %s", response)
         X = None
-        for f in self.data.columns.values:
-            if f == response:
-                continue
-            elif X is None:
-                X = self.data.ix[:, f]
-            else:
-                X = pd.concat([X, self.data.ix[:, f]], axis=1)
-        return X
+        if laplacian is None:
+            for f in self.data.columns.values:
+                if f == response:
+                    continue
+                elif X is None:
+                    X = self.data.ix[instance_index, f]
+                else:
+                    X = pd.concat([X, self.data.ix[instance_index, f]], axis=1)
+            return X
+        else:
+            for f in laplacian.columns.values:
+                if f == response:
+                    continue
+                elif X is None:
+                    X = self.data.ix[instance_index, f]
+                else:
+                    X = pd.concat([X, self.data.ix[instance_index, f]], axis=1)
+            return X
 
     def get_data(self):
         return self.data
@@ -249,5 +285,14 @@ class ModelManager(object):
             f = self.featureIndex[feature_name]
         except IndexError:
             logging.error("Feature index not found.")
+            pass
+        return f
+
+    def feature_at_index(self, index):
+        f = None
+        try:
+            f = self.featureIndex[index]
+        except IndexError:
+            logging.error("Index not found.")
             pass
         return f
