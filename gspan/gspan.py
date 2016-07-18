@@ -546,7 +546,7 @@ def check_entity_in_pattern(e, pattern):
 # 
 # Generate initial edges and start the mining process
 #
-def project(database, frequent_nodes, minsup, freq_labels, length, mapper, labels, model, constraints, dependency_matrix, entity_dict, product_map):
+def project(database, frequent_nodes, minsup, freq_labels, length, mapper, labels, model, constraints):
 	global __subgraph_count
 	global __positive_index
 	global __n_pos
@@ -560,12 +560,6 @@ def project(database, frequent_nodes, minsup, freq_labels, length, mapper, label
 	global __negative_index
 	global __dependency_matrix
 	global __entity_dict
-
-
-
-
-	__entity_dict = entity_dict
-	__dependency_matrix = dependency_matrix	# |entity| x |entity| 0-1 matrix
 
 	__cl_constraints = constraints[0]
 	__ml_constraints = constraints[1]

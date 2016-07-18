@@ -3,6 +3,7 @@ __author__ = 'martin'
 from rdflib import URIRef, ConjunctiveGraph, RDF, Literal, BNode
 import numpy as np
 import graph
+import pickle
 
 HAS_PART = URIRef("http://www.siemens.com/ontology/demonstrator#hasPart")
 HAS_PROPERTY = URIRef("http://www.siemens.com/ontology/demonstrator#hasProperty")
@@ -13,6 +14,7 @@ EXECUTED_OPERATION = URIRef("http://www.siemens.com/ontology/demonstrator#execut
 MADE_OF = URIRef("http://www.siemens.com/ontology/demonstrator#isMadeOf")
 ON_PART = URIRef("http://www.siemens.com/ontology/demonstrator#onPart")
 LINK = URIRef("http://www.siemens.com/ontology/demonstrator#link")
+ID = URIRef("http://www.siemens.com/ontology/demonstrator#ID")
 
 # Parts
 PE_BIG = URIRef("http://www.siemens.com/ontology/demonstrator#PE-Handle-Big")
@@ -23,7 +25,8 @@ PIN1 = URIRef("http://www.siemens.com/ontology/demonstrator#Fixture-Pin1")
 PIN2 = URIRef("http://www.siemens.com/ontology/demonstrator#Fixture-Pin2")
 SHAFT_A = URIRef("http://www.siemens.com/ontology/demonstrator#IronShaft-A")
 SHAFT_B = URIRef("http://www.siemens.com/ontology/demonstrator#IronShaft-B")
-SCREW_DRIVER = URIRef("http://www.siemens.com/ontology/demonstrator#ScrewDriver-A")
+SCREW_DRIVER_A = URIRef("http://www.siemens.com/ontology/demonstrator#ScrewDriver-A")
+SCREW_DRIVER_A = URIRef("http://www.siemens.com/ontology/demonstrator#ScrewDriver-B")
 
 # Part properties
 color_blue = URIRef("http://www.siemens.com/ontology/demonstrator#ColorBlue")
@@ -33,20 +36,20 @@ luxury_stone1 = URIRef("http://www.siemens.com/ontology/demonstrator#LuxuryStone
 luxury_stone2 = URIRef("http://www.siemens.com/ontology/demonstrator#LuxuryStone2")
 
 # Equipment layout
-station1a = URIRef("http://www.siemens.com/ontology/demonstrator#Station1a")
-station1b = URIRef("http://www.siemens.com/ontology/demonstrator#Station1b")
-conveyor1a = URIRef("http://www.siemens.com/ontology/demonstrator#Conveyor1a")
-conveyor1b = URIRef("http://www.siemens.com/ontology/demonstrator#Conveyor1b")
-station2 = URIRef("http://www.siemens.com/ontology/demonstrator#Station2")
-robot = URIRef("http://www.siemens.com/ontology/demonstrator#Robot")
+robo1 = URIRef("http://www.siemens.com/ontology/demonstrator#WeldingRobot-A1")
+robo2 = URIRef("http://www.siemens.com/ontology/demonstrator#WeldingRobot-B1")
+framepickerOld = URIRef("http://www.siemens.com/ontology/demonstrator#Frame-Picker-Old")
+framepickerNew = URIRef("http://www.siemens.com/ontology/demonstrator#Frame-Picker-New")
+testingstationA = URIRef("http://www.siemens.com/ontology/demonstrator#Testing-Station-A")
+testingstationB = URIRef("http://www.siemens.com/ontology/demonstrator#Testing-Station-B")
 
 # Properties
 speed_m = URIRef("http://www.siemens.com/ontology/demonstrator#SpeedMedium")
 speed_h = URIRef("http://www.siemens.com/ontology/demonstrator#SpeedHigh")
 program17 = URIRef("http://www.siemens.com/ontology/demonstrator#Program17")
 program18 = URIRef("http://www.siemens.com/ontology/demonstrator#Program18")
-toolA = URIRef("http://www.siemens.com/ontology/demonstrator#ToolA")
-toolB = URIRef("http://www.siemens.com/ontology/demonstrator#ToolB")
+toolwelding = URIRef("http://www.siemens.com/ontology/demonstrator#Welding-Tool")
+toolscrewing = URIRef("http://www.siemens.com/ontology/demonstrator#Screwing-Tool")
 event1 = URIRef("http://www.siemens.com/ontology/demonstrator#EventOserved")
 event2 = URIRef("http://www.siemens.com/ontology/demonstrator#EventGlimpsed")
 
@@ -60,280 +63,98 @@ op6 = URIRef("http://www.siemens.com/ontology/demonstrator#Operation/Assembly2")
 op7 = URIRef("http://www.siemens.com/ontology/demonstrator#Operation/Finishing")
 process = URIRef("http://www.siemens.com/ontology/demonstrator#Process")
 
-# variables
 
-def generateOperations(product, quality):
-    # discretize attributes / anomaly / events as boolean attributes
-    # machine and bOm connection to ontology
-    # temporal graphs
-    # instances more similar to each other the more similar their graph connections are
-    pass
-
-
-def generateProcess(product, quality):
+def generate_process(id):
+    """
+    Provides the kind of process to simulate
+    :return:
+    """
     g = ConjunctiveGraph()
     g.add((process, RDF.type, process))
-    # layout configuration
-    g.add((station1a, HAS_PART, conveyor1a))
-    g.add((station1b, HAS_PART, conveyor1b))
+    g.add((process, ID, Literal(id)))
+    label = np.zeros(6)
+    # label { 0 = negative, 1 = welding-temp anomaly,
+        # 2 = product-welding qa fail, 3 = special part scratched qa fail,
+        # 4 = special part shaky qa fail, 5 = frame fitting qa fail }
+        # correlation between 1-2-5 and 3-4
+    # correlation between assigned equipment, product type, and failure (label)
+    if np.random.random() < 0.5:
+        label[0] = 1
+        process(g, type="normal")
+    else:
+        if np.random.random() < 0.5:
+            process(g, type="welding")
+            label[1] = 1
+            if np.random.random() < 0.8:
+                label[2] = 1
+            if np.random.random() < 0.8:
+                label[5] = 1
+        else:
+            process(g, type="special")
+            label[3] = 1
+            if np.random.random() < 0.8:
+                label[4] = 1
+    return g, label
 
-    if not quality and np.random.random() <= 0.2:
-            g.add((station1a, HAS_PART, robot))
-            g.add((robot, HAS_PROPERTY, speed_h))
+def process(g, type):
+    g.add((process, EXECUTED_OPERATION, op1))
+    if np.random.random() < 0.5:
+        screw = SCREW_DRIVER_A
+        if np.random.random() < 0.5:
+            iron_shaft = SHAFT_A
+            pe_handle = PE_BIG
+        else:
+            iron_shaft = SHAFT_B
+            pe_handle = PE_SMALL
+    else:
+        screw = SCREW_DRIVER_B
+        if np.random.random() < 0.5:
+            iron_shaft = SHAFT_A
+            pe_handle = PE_BIG
+        else:
+            iron_shaft = SHAFT_B
+            pe_handle = PE_SMALL
 
-    if product == 1:
-        g.add((process, EXECUTED_OPERATION, op1))
+    if type == "normal":
+        if np.random.random() < 0.9:
+            frame_picker = framepickerNew
+        else:
+            frame_picker = framepickerOld
+        g.add((op1, ON_PART, screw))
+        g.add((op1, USED_EQUIPMENT, frame_picker))
+        g.add((op1, HAS_FOLLOWER, op3))
         g.add((op1, HAS_FOLLOWER, op4))
-        if quality:
-            if np.random.random() <= 0.3:
-                g.add((op7, HAS_FOLLOWER, op1))
-            if np.random.random() <= 0.5: # station1a or b (program alsways 18)
-                g.add((op1, USED_EQUIPMENT, conveyor1a))
-                g.add((conveyor1a, HAS_PROPERTY, program18))
-            else:
-                g.add((op1, USED_EQUIPMENT, conveyor1b))
-                g.add((conveyor1b, HAS_PROPERTY, program18))
-            g.add((op1, ON_PART, PE_BIG))
-            if np.random.random() <= 0.5: # shaft a or b
-                shaft = SHAFT_A
-            else:
-                shaft = SHAFT_B
-            g.add((op4, ON_PART, shaft))
-            g.add((SCREW_DRIVER, MADE_OF, PE_BIG))
-            g.add((PE_BIG, MADE_OF, shaft))
-            blank_pin1 = BNode()
-            g.add((shaft, MADE_OF, blank_pin1))
-            g.add((blank_pin1, LINK, PIN1))
-            blank_pin2 = BNode()
-            g.add((shaft, MADE_OF, blank_pin2))
-            g.add((blank_pin2, LINK , PIN1))
-            if np.random.random() <= 0.3:
-                g.add((op4, HAS_FOLLOWER, op5))
-                g.add((op5, HAS_FOLLOWER, op7))
-                g.add((op5, USED_EQUIPMENT, station2))
-                g.add((op5, ON_PART, SCREW_DRIVER))
-                g.add((station2, HAS_PROPERTY, toolA))
-                g.add((shaft, HAS_PROPERTY, luxury_stone1))
-            else:
-                g.add((op4, HAS_FOLLOWER, op7))
-            g.add((op7, HAS_EVENT, event1))
-        else:
-            causation=False
-            if np.random.random() <= 0.6:
-                g.add((op7, HAS_FOLLOWER, op1))
+        g.add((op3, ON_PART, iron_shaft))
+        g.add((op3, ON_PART, pe_handle))
+        g.add((op4, ON_PART, iron_shaft))
+        g.add((op4, ON_PART, pe_handle))
+        g.add((op4, ON_PART, screw))
+        g.add((op4, ON_PART, PIN1))
 
-            if np.random.random() <= 0.5: # s1a or 1b (if conveyor1a --> 17)
-                conveyor = conveyor1a
-                causation=True
-            else:
-                conveyor = conveyor1b
-            g.add((op1, USED_EQUIPMENT, conveyor))
-            if causation and np.random.random <= 0.8:
-                g.add((conveyor, HAS_PROPERTY, program17))
-            else:
-                g.add((conveyor, HAS_PROPERTY, program18))
-            g.add((op1, ON_PART, PE_BIG))
-            if np.random.random() <= 0.5: # shaft a or b
-                shaft = SHAFT_A
-            else:
-                shaft = SHAFT_B
-            g.add((op4, ON_PART, shaft))
-            g.add((SCREW_DRIVER, MADE_OF, PE_BIG))
-            g.add((PE_BIG, MADE_OF, shaft))
-            blank_pin1 = BNode()
-            g.add((shaft, MADE_OF, blank_pin1))
-            g.add((blank_pin1, LINK, PIN1))
-            blank_pin2 = BNode()
-            g.add((shaft, MADE_OF, blank_pin2))
-            g.add((blank_pin2, LINK , PIN1))
-            if np.random.random() <= 0.3:
-                g.add((op4, HAS_FOLLOWER, op5))
-                g.add((op5, HAS_FOLLOWER, op7))
-                g.add((op5, USED_EQUIPMENT, station2))
-                g.add((op5, ON_PART, SCREW_DRIVER))
-                if causation:
-                    g.add((station2, HAS_PROPERTY, toolB))
-                else:
-                    g.add((station2, HAS_PROPERTY, toolA))
-                g.add((shaft, HAS_PROPERTY, luxury_stone2))
-            else:
-                g.add((op4, HAS_FOLLOWER, op7))
-            g.add((op7, HAS_EVENT, event1))
+    if type == "special":
+        if np.random.random() < 0.2:
+            frame_picker = framepickerNew
+        else:
+            frame_picker = framepickerOld
 
-    elif product == 2:
-        # small, 1 pin, shaft a, shaft
-        g.add((process, EXECUTED_OPERATION, op2))
-        if quality:
-            if np.random.random() <= 0.5: # station1a or b (program alsways 18)
-               g.add((op2, USED_EQUIPMENT, station1a))
-               g.add((station1a, HAS_PROPERTY, program18))
-            else:
-                g.add((op2, USED_EQUIPMENT, station1b))
-                g.add((station1b, HAS_PROPERTY, program18))
-            g.add((op2, ON_PART, PE_SMALL))
-            if np.random.random() <= 0.5: # shaft a or b
-                shaft = SHAFT_A
-            else:
-                shaft = SHAFT_B
-            g.add((op2, HAS_FOLLOWER, op4))
-            g.add((op4, ON_PART, shaft))
-            g.add((SCREW_DRIVER, MADE_OF, PE_SMALL))
-            g.add((PE_SMALL, MADE_OF, shaft))
-            g.add((shaft, MADE_OF, PIN1))
-            if np.random.random() <= 0.33:
-                g.add((shaft, HAS_PROPERTY, color_blue))
-            elif np.random.random() <= 0.5:
-                g.add((shaft, HAS_PROPERTY, color_black))
-            else:
-                g.add((shaft, HAS_PROPERTY, color_red))
-        else:
-            if np.random.random() <= 0.5: # station1a or b (program alsways 18)
-               g.add((op2, USED_EQUIPMENT, station1a))
-               g.add((station1a, HAS_PROPERTY, program18))
-            else:
-                g.add((op2, USED_EQUIPMENT, station1b))
-                g.add((station1b, HAS_PROPERTY, program18))
-            g.add((op2, ON_PART, PE_SMALL))
-            if np.random.random() <= 0.5: # shaft a or b
-                shaft = SHAFT_A
-            else:
-                shaft = SHAFT_B
-            g.add((op2, HAS_FOLLOWER, op4))
-            g.add((op4, ON_PART, shaft))
-            g.add((SCREW_DRIVER, MADE_OF, PE_SMALL))
-            g.add((PE_SMALL, MADE_OF, shaft))
-            g.add((shaft, MADE_OF, PIN1))
-            if shaft == SHAFT_A and np.random.random() <= 0.8:
-                g.add((shaft, HAS_PROPERTY, color_blue))
-            elif np.random.random() <= 0.5:
-                g.add((shaft, HAS_PROPERTY, color_black))
-            else:
-                g.add((shaft, HAS_PROPERTY, color_red))
-    elif product == 3:
-        g.add((process, EXECUTED_OPERATION, op1))
-        g.add((process, EXECUTED_OPERATION, op2))
-        if quality:
-            if np.random.random() <= 0.4: # station1a or b (program alsways 18)
-               g.add((op2, USED_EQUIPMENT, station1a))
-               g.add((station1a, HAS_PROPERTY, program18))
-            else:
-                g.add((op2, USED_EQUIPMENT, station1b))
-                g.add((station1b, HAS_PROPERTY, program18))
-            g.add((op2, ON_PART, PE_SMALL))
-            if np.random.random() <= 0.6: # shaft a or b
-                shaft = SHAFT_A
-            else:
-                shaft = SHAFT_B
-            g.add((op1, HAS_FOLLOWER, op4))
-            g.add((op2, HAS_FOLLOWER, op4))
-            g.add((op4, ON_PART, shaft))
-            g.add((SCREW_DRIVER, MADE_OF, PE_SMALL))
-            g.add((PE_SMALL, MADE_OF, shaft))
-            g.add((shaft, MADE_OF, PIN1))
-            if np.random.random() <= 0.33:
-                g.add((shaft, HAS_PROPERTY, color_blue))
-            elif np.random.random() <= 0.5:
-                g.add((shaft, HAS_PROPERTY, color_black))
-            else:
-                g.add((shaft, HAS_PROPERTY, color_red))
-            causation1 = False
-            causation2 = False
-            if np.random.random() <= 0.7:
-                causation1 = True
-                g.add((op1, ON_PART, SPECIAL_PART))
-            if np.random.random() <= 0.5:
-                causation2 = True
-                g.add((SPECIAL_PART, HAS_PART, PIN1))
-            if causation1 and causation2 and np.random.random() <= 0.2:
-                g.add((PIN1, HAS_PROPERTY, color_black))
-        else:
-            if np.random.random() <= 0.9:
-                g.add((op7, HAS_FOLLOWER, op1))
-            causation = False
-            if np.random.random() <= 0.5: # s1a or 1b (if conveyor1a --> 17)
-                conveyor = conveyor1a
-            else:
-                conveyor = conveyor1b
-            g.add((op1, USED_EQUIPMENT, conveyor))
-            if conveyor == conveyor1a and np.random.random <= 0.8:
-                pass
-            g.add((op1, ON_PART, PE_BIG))
-            if np.random.random() <= 0.5: # shaft a or b
-                shaft = SHAFT_A
-                g.add((conveyor, HAS_PROPERTY, program17))
-            else:
-                shaft = SHAFT_B
-            g.add((op4, ON_PART, shaft))
-            g.add((SCREW_DRIVER, MADE_OF, PE_BIG))
-            g.add((PE_BIG, MADE_OF, shaft))
-            blank_pin1 = BNode()
-            g.add((shaft, MADE_OF, blank_pin1))
-            g.add((blank_pin1, LINK, PIN1))
-            blank_pin2 = BNode()
-            g.add((shaft, MADE_OF, blank_pin2))
-            g.add((blank_pin2, LINK , PIN1))
-            if np.random.random() <= 0.5:
-                g.add((op4, HAS_FOLLOWER, op5))
-                g.add((op5, HAS_FOLLOWER, op7))
-                g.add((op5, USED_EQUIPMENT, station2))
-                g.add((op5, ON_PART, SCREW_DRIVER))
-                g.add((station2, HAS_PROPERTY, toolA))
-                if causation:
-                    g.add((shaft, HAS_PROPERTY, luxury_stone2))
-            else:
-                g.add((op4, HAS_FOLLOWER, op7))
-            g.add((op7, HAS_EVENT, event2))
-            causation1 = False
-            causation2 = False
-            if np.random.random() <= 0.3:
-                causation1 = True
-                g.add((op1, ON_PART, SPECIAL_PART))
-            if np.random.random() <= 0.5:
-                causation2 = True
-                g.add((SPECIAL_PART, HAS_PART, PIN1))
-            if causation1 and causation2 and np.random.random() <= 0.95:
-                g.add((PIN1, HAS_PROPERTY, color_black))
-    elif product == 4:
-        g.add((process, EXECUTED_OPERATION, op1))
-        g.add((op1, HAS_FOLLOWER, op4))
-        g.add((op4, HAS_FOLLOWER, op5))
-        g.add((op5, HAS_FOLLOWER, op7))
-        g.add((op5, USED_EQUIPMENT, station2))
-        g.add((op5, ON_PART, SCREW_DRIVER))
-        g.add((station2, HAS_PROPERTY, toolA))
-        if quality:
-            causation1=False
-            causation2=False
-            if np.random.random() <= 0.7:
-                causation1=True
-                g.add((op7, ON_PART, SPECIAL_PART2))
-            if np.random.random() <= 0.5:
-                causation2=True
-                g.add((SPECIAL_PART2, HAS_PART, PIN1))
-            if causation1 and causation2 and np.random.random() <= 0.1:
-                g.add((PIN1, HAS_PROPERTY, color_red))
-        else:
-            causation1=False
-            causation2=False
-            if np.random.random() <= 0.3:
-                causation1=True
-                g.add((op7, ON_PART, SPECIAL_PART2))
-            if np.random.random() <= 0.5:
-                causation2=True
-                g.add((SPECIAL_PART2, HAS_PART, PIN1))
-            if causation1 and causation2 and np.random.random() <= 0.95:
-                g.add((PIN1, HAS_PROPERTY, color_red))
-    return g
 
-def execute(num_processes):
-    pos_labels = []
-    product_map = dict()
+    if type == "welding":
+        pass
+
+
+def execute(num_processes, path):
+    """
+    Starts simulation of fixed number of production executions
+    :param num_processes:
+    :param path:
+    :return:
+    """
+    labels_mapping = dict()
     for i in xrange(0, num_processes):
-        product = np.random.randint(1,4)
-        quality = np.random.random() < 0.8
-        g = generateProcess(product, quality)
-        product_map[i] = product
-        if quality:
-            pos_labels.append(i)
-        g.serialize(open("D:\\Dissertation\\Data Sets\\Manufacturing\\execution_"+str(i)+"_.rdf", "w"))
-    return pos_labels, product_map
+        g, label = generate_process(i)
+        rdffile = open(path + "\\execution_"+str(i)+"_.rdf", "w")
+        labels_mapping[i] = label
+        g.serialize(rdffile)
+    mappingfile = open(path + "\\mapping.pickle", 'w')
+    pickle.dump(labels_mapping, mappingfile)
+    return labels_mapping

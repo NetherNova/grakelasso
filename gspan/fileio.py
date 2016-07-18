@@ -6,6 +6,7 @@ from rdflib import ConjunctiveGraph, URIRef, RDF, BNode
 import numpy as np
 from collections import defaultdict
 from sklearn import cross_validation
+from simulation import ID
 
 def read_file(filename, frequent=[]):
 	ret = []
@@ -25,7 +26,8 @@ def read_file(filename, frequent=[]):
 				edge_id = 0
 
 			g = graph.Graph()
-			g.id = count
+			#g.id = count
+			g.id = line.split()[1]
 			count += 1
 			continue
 
@@ -128,10 +130,8 @@ def create_graph(filelist, output_train, output_test, pos_graphs, cv, predicate,
 				graph_labels_list_tmp = graph_labels_test
 			for f in filelist_tmp:
 				num = int(f.split("_")[1])
-				if num in pos_graphs:
-					graph_labels_tmp.append(1)
-				else:
-					graph_labels_tmp.append(0)
+				labels = pos_graphs[num]
+				graph_labels_tmp.append(labels)
 				g = ConjunctiveGraph()
 				g.load(open(f, "rb"))
 				operations = list(g.subjects(predicate, ob))
@@ -144,7 +144,8 @@ def create_graph(filelist, output_train, output_test, pos_graphs, cv, predicate,
 					local_entity_counter = 0
 					local_entity_map = dict()
 					dfs_triples(entity_set, entity_map, edge_set, relation_map, g, o)
-					tf.write("t")
+					id = g.objects(o, ID)
+					tf.write("t" + str(id))
 					tf.write("\n")
 					for (local_id, global_id) in sorted(entity_set, key=lambda x: x[0]):
 						tf.write("v" + " " + str(local_id) + " " + str(global_id))
