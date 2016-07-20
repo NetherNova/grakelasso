@@ -93,8 +93,7 @@ def build_right_most_path(dfs_codes):
 # Iterate through the projection to find potential next edges (?)
 #
 def genumerate(projection, right_most_path, dfs_codes, min_label, db, mapper):
-	global __cl_constraints
-	global __ml_constraints
+
 	#print min_label, len(projection)
 	pm_backward = {}
 	pm_forward = {}
@@ -111,88 +110,6 @@ def genumerate(projection, right_most_path, dfs_codes, min_label, db, mapper):
 						dfs_codes, db, min_label)
 		pm_forward = get_other_forward(p, right_most_path, h, pm_forward,
 						dfs_codes, db, min_label)
-	if (len(pm_backward) > 0 or len(pm_forward) > 0):
-		if len(__cl_constraints) > 0:
-			pm_backward, pm_forward = check_cl_constraints(p_graph, pm_backward, pm_forward, mapper)
-		if len(__ml_constraints) > 0:
-			pm_backward, pm_forward = check_ml_constraints(p_graph, pm_backward, pm_forward, mapper)
-	return pm_backward, pm_forward
-
-
-def check_ml_constraints(p_graph, pm_backward, pm_forward, mapper):
-	global __ml_constraints
-
-	retain_list = []
-	remove_list = []
-	for c in __ml_constraints:
-		if c[0] == "*":
-			for k in pm_backward:
-				tuple = ("*", mapper[k.to_label], "*")
-				if tuple == c:
-					retain_list.append(k)
-			for k in pm_forward:
-				tuple = ("*", mapper[k.to_label], "*")
-				if tuple == c:
-					retain_list.append(k)
-		else:
-			for k in pm_backward:
-				tuple = (mapper[k.from_label], mapper[k.to_label], mapper[k.edge_label])
-				if tuple == c:
-					retain_list.append(k)
-			for k in pm_forward:
-				tuple = (mapper[k.from_label], mapper[k.to_label], mapper[k.edge_label])
-				if tuple == c:
-					retain_list.append(k)
-	if len(retain_list) > 0:
-		for k in pm_backward:
-			if not k in retain_list:
-				remove_list.append(k)
-		for k in pm_forward:
-			if not k in retain_list:
-				remove_list.append(k)
-		for r in remove_list:
-			try:
-				pm_forward.pop(r)
-			except KeyError:
-				pass
-			try:
-				pm_backward.pop(r)
-			except KeyError:
-				pass
-	return pm_backward, pm_forward
-
-def check_cl_constraints(p_graph, pm_backward, pm_forward, mapper):
-	global __cl_constraints
-
-	remove_list = []
-	for c in __cl_constraints:
-		if c[0] == "*":
-			for k in pm_backward:
-				tuple = ("*", mapper[k.to_label], "*")
-				if tuple == c:
-					remove_list.append(k)
-			for k in pm_forward:
-				tuple = ("*", mapper[k.to_label], "*")
-				if tuple == c:
-					remove_list.append(k)
-		else:
-			for k in pm_backward:
-				tuple = (mapper[k.from_label], mapper[k.to_label], mapper[k.edge_label])
-				if tuple == c:
-					remove_list.append(k)
-			for k in pm_forward:
-				tuple = (mapper[k.from_label], mapper[k.to_label], mapper[k.edge_label])
-				if tuple == c:
-					remove_list.append(k)
-	for r in remove_list:
-		try:
-			pm_forward.pop(r)
-		except KeyError:
-			pass
-		try:
-			pm_backward.pop(r)
-		except KeyError:
-			pass
 	return pm_backward, pm_forward
 
 #
@@ -540,13 +457,10 @@ def check_entity_in_pattern(e, pattern):
 		pass
 	return True
 
-
-
-
 # 
 # Generate initial edges and start the mining process
 #
-def project(database, frequent_nodes, minsup, freq_labels, length, mapper, labels, model, constraints):
+def project(database, frequent_nodes, minsup, freq_labels, length, L, L_hat, n_graphs, n_pos, n_neg, pos_index, neg_index, graph_id_to_list_id, mapper, labels, model, constraints, graph_entities):
 	global __subgraph_count
 	global __positive_index
 	global __n_pos
@@ -558,46 +472,24 @@ def project(database, frequent_nodes, minsup, freq_labels, length, mapper, label
 	global __cl_constraints
 	global __ml_constraints
 	global __negative_index
-	global __dependency_matrix
-	global __entity_dict
+	global __graph_id_to_list_id
+	global __graph_neighbors
 
+	__graph_neighbors = graph_entities
 	__cl_constraints = constraints[0]
 	__ml_constraints = constraints[1]
 
-	__positive_index = labels
-	__negative_index = np.array(1 - np.array(__positive_index), dtype=bool)
-	__n_pos = sum(__positive_index)
-	__n_graphs = len(__positive_index)
+	__positive_index = pos_index
+	__negative_index = neg_index
+	__n_pos = n_pos
+	__n_graphs = n_graphs
+	__L = L
+	__L_hat = L_hat
+	__graph_id_to_list_id = graph_id_to_list_id
 
 	__dataset = []
 	__pattern_set = []
 	__subgraph_count = 0
-
-	W = np.zeros((__n_graphs, __n_graphs))
-	A = 0
-	B = 0
-	for i in xrange(0, __n_graphs):
-		for j in xrange(0, __n_graphs):
-			if __positive_index[i] != __positive_index[j]:
-				A += 1
-			if __positive_index[i] == __positive_index[j]:
-				B += 1
-
-	for i in xrange(0, __n_graphs):
-		for j in xrange(0, __n_graphs):
-			if __positive_index[i] != __positive_index[j]:
-				W[i, j] = 1.0 / A
-			else:
-				W[i, j] = -1.0 / B
-
-
-	D = np.zeros((__n_graphs, __n_graphs))
-	for i in xrange(0, __n_graphs):
-		D[i,i] = sum(W[i, ])
-	__L = D - W
-
-	__L_hat = np.copy(__L)
-	__L_hat[__L_hat < 0] = 0
 
 	dfs_codes = []
 
@@ -643,21 +535,6 @@ def project(database, frequent_nodes, minsup, freq_labels, length, mapper, label
 
 		dfs_codes.pop()	# dfs_codes is a list of all projections for this initial pattern
 
-	if product_map is not None:
-		num_features = len(__dataset[0])
-		p1 = np.zeros(num_features)
-		p2 = np.zeros(num_features)
-		p3 = np.zeros(num_features)
-		for i in xrange(num_features):
-			if product_map[i] == 1:
-				p1[i] = 1
-			if product_map[i] == 2:
-				p2[i] = 1
-			if product_map[i] == 3:
-				p3[i] = 1
-		__pattern_set.append(p1)
-		__pattern_set.append(p2)
-		__pattern_set.append(p3)
 	return __dataset, __pattern_set
 
 # 
@@ -722,22 +599,19 @@ def q(projection, vector=[], hat=False):
 
 	if len(vector) == 0:
 		vector = projection_to_vector(projection)
-	#print(vector)
-	# structure weight according to BoM / Operation (Causing)
-
 	if hat:
-		ret = vector.dot(__L).dot(vector)
-	else:
 		ret = vector.dot(__L_hat).dot(vector)
-
-	#print(ret)
+	else:
+		ret = vector.dot(__L).dot(vector)
 	return ret, vector
 
 def projection_to_vector(projection):
 	global __n_graphs
+	global __graph_id_to_list_id
 	vector = np.zeros(__n_graphs)
 	for p in projection:
-		vector[p.id] = 1
+		list_id = __graph_id_to_list_id[p.id]
+		vector[list_id] = 1
 	return vector
 
 def get_min_q():
@@ -764,9 +638,6 @@ def get_min_freq():
 		if ret < min_freq:
 			min_freq = ret
 			min_index = i
-	#if remove:
-	#	__dataset.pop(min_index)
-	#	__pattern_set.pop(min_index)
 	return min_index, min_freq
 
 def greedy_value(vector):
@@ -792,14 +663,30 @@ def get_min_greedy():
 		if ret < min_freq:
 			min_freq = ret
 			min_index = i
-	#if remove:
-	#	__dataset.pop(min_index)
-	#	__pattern_set.pop(min_index)
 	return min_index, min_freq
 
-def variance(pair):
+
+def kb_score(g):
+	global __graph_neighbors
+	count = 0
+	for s,o,p in g:
+		if s in __graph_neighbors:
+			count += 1
+		if o in __graph_neighbors:
+			count += 1
+	return count
+
+def get_min_kb_score():
 	global __dataset
-	__dataset[pair[0]]
+	global __patern_set
+	min_freq = sys.maxint
+	min_index = 0
+	for i, g in enumerate(__pattern_set):
+		ret = kb_score(g)
+		if ret < min_freq:
+			min_freq = ret
+			min_index = i
+	return min_index, min_freq
 
 def evaluate_and_prune(dfs_codes, mapper, projection, threshold, length, model):
 	global __pattern_set
@@ -848,6 +735,21 @@ def evaluate_and_prune(dfs_codes, mapper, projection, threshold, length, model):
 		if q_val <= threshold:
 			return True, threshold
 		return False, threshold
+
+	elif model == "knowledge-graph":
+		vector = projection_to_vector(projection)
+		q_val = kb_score(g)
+		min_index, threshold = get_min_kb_score()
+		if get_length() < length or q_val > threshold:
+			append(vector)
+			__pattern_set.append(g)
+		if get_length() > length:
+			__dataset.pop(min_index)
+			__pattern_set.pop(min_index)
+		if q_val <= threshold:
+			return True, threshold
+		return False, threshold
+
 
 def get_length():
 	global __dataset

@@ -26,8 +26,7 @@ def read_file(filename, frequent=[]):
 				edge_id = 0
 
 			g = graph.Graph()
-			#g.id = count
-			g.id = line.split()[1]
+			g.id = count
 			count += 1
 			continue
 
@@ -144,8 +143,8 @@ def create_graph(filelist, output_train, output_test, pos_graphs, cv, predicate,
 					local_entity_counter = 0
 					local_entity_map = dict()
 					dfs_triples(entity_set, entity_map, edge_set, relation_map, g, o)
-					id = g.objects(o, ID)
-					tf.write("t" + str(id))
+					id = list(g.objects(o, ID))[0]
+					tf.write("t")
 					tf.write("\n")
 					for (local_id, global_id) in sorted(entity_set, key=lambda x: x[0]):
 						tf.write("v" + " " + str(local_id) + " " + str(global_id))
@@ -341,3 +340,51 @@ def parse_csv(filename):
 		f.close()
 	return np.array(X)
 
+
+def preproscessing(database_train, class_index, labels_mapping):
+	graph_id_to_list_id = dict()
+	list_id_to_graph_id = dict()
+	n_graphs = len(database_train)
+	n_pos = 0
+	pos_index = []
+
+	for i, graph in enumerate(database_train):
+		graph_id_to_list_id[graph.id] = i
+		list_id_to_graph_id[i] = graph.id
+		if labels_mapping[graph.id][class_index] == 1:
+			n_pos += 1
+			pos_index.append(i)
+
+	n_neg = n_graphs - n_pos
+	neg_index = np.array(1 - np.array(pos_index), dtype=bool)
+
+	W = np.zeros((n_graphs, n_graphs))
+	A = 0
+	B = 0
+	for i in xrange(0, n_graphs):
+		graph_id_i = list_id_to_graph_id[i]
+		for j in xrange(0, n_graphs):
+			graph_id_j = list_id_to_graph_id[j]
+			if labels_mapping[graph_id_i][class_index] != labels_mapping[graph_id_j][class_index]:
+				A += 1
+			if labels_mapping[graph_id_i][class_index] == labels_mapping[graph_id_j][class_index]:
+				B += 1
+
+	for i in xrange(0, n_graphs):
+		graph_id_i = list_id_to_graph_id[i]
+		for j in xrange(0, n_graphs):
+			graph_id_j = list_id_to_graph_id[j]
+			if labels_mapping[graph_id_i][class_index] == labels_mapping[graph_id_j][class_index]:
+				W[i, j] = 1.0 / A
+			else:
+				W[i, j] = -1.0 / B
+
+	D = np.zeros((n_graphs, n_graphs))
+	for i in xrange(0, n_graphs):
+		D[i,i] = sum(W[i, ])
+	L = D - W
+
+	L_hat = np.copy(L)
+	L_hat[L_hat < 0] = 0
+
+	return L, L_hat, n_graphs, n_pos, n_neg, pos_index, neg_index, graph_id_to_list_id

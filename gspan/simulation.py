@@ -26,7 +26,7 @@ PIN2 = URIRef("http://www.siemens.com/ontology/demonstrator#Fixture-Pin2")
 SHAFT_A = URIRef("http://www.siemens.com/ontology/demonstrator#IronShaft-A")
 SHAFT_B = URIRef("http://www.siemens.com/ontology/demonstrator#IronShaft-B")
 SCREW_DRIVER_A = URIRef("http://www.siemens.com/ontology/demonstrator#ScrewDriver-A")
-SCREW_DRIVER_A = URIRef("http://www.siemens.com/ontology/demonstrator#ScrewDriver-B")
+SCREW_DRIVER_B = URIRef("http://www.siemens.com/ontology/demonstrator#ScrewDriver-B")
 
 # Part properties
 color_blue = URIRef("http://www.siemens.com/ontology/demonstrator#ColorBlue")
@@ -61,24 +61,24 @@ op4 = URIRef("http://www.siemens.com/ontology/demonstrator#Operation/WholeAssemb
 op5 = URIRef("http://www.siemens.com/ontology/demonstrator#Operation/Assembly1")
 op6 = URIRef("http://www.siemens.com/ontology/demonstrator#Operation/Assembly2")
 op7 = URIRef("http://www.siemens.com/ontology/demonstrator#Operation/Finishing")
-process = URIRef("http://www.siemens.com/ontology/demonstrator#Process")
+process_uri = URIRef("http://www.siemens.com/ontology/demonstrator#Process")
 
 
-def generate_process(id):
+def generate_process(id, num_classes):
     """
     Provides the kind of process to simulate
     :return:
     """
     g = ConjunctiveGraph()
-    g.add((process, RDF.type, process))
-    g.add((process, ID, Literal(id)))
-    label = np.zeros(6)
-    # label { 0 = negative, 1 = welding-temp anomaly,
+    g.add((process_uri, RDF.type, process_uri))
+    g.add((process_uri, ID, Literal(id)))
+    label = np.zeros(num_classes)
+    # label { 0 = generic qa failure, 1 = welding-temp anomaly,
         # 2 = product-welding qa fail, 3 = special part scratched qa fail,
         # 4 = special part shaky qa fail, 5 = frame fitting qa fail }
         # correlation between 1-2-5 and 3-4
     # correlation between assigned equipment, product type, and failure (label)
-    if np.random.random() < 0.5:
+    if np.random.random() < 0.2:
         label[0] = 1
         process(g, type="normal")
     else:
@@ -97,7 +97,7 @@ def generate_process(id):
     return g, label
 
 def process(g, type):
-    g.add((process, EXECUTED_OPERATION, op1))
+    g.add((process_uri, EXECUTED_OPERATION, op1))
     if np.random.random() < 0.5:
         screw = SCREW_DRIVER_A
         if np.random.random() < 0.5:
@@ -136,13 +136,22 @@ def process(g, type):
             frame_picker = framepickerNew
         else:
             frame_picker = framepickerOld
-
+        g.add((op1, ON_PART, screw))
+        g.add((op1, USED_EQUIPMENT, frame_picker))
+        g.add((op1, HAS_FOLLOWER, op3))
+        g.add((op1, HAS_FOLLOWER, op4))
+        g.add((op3, ON_PART, iron_shaft))
+        g.add((op3, ON_PART, pe_handle))
+        g.add((op4, ON_PART, iron_shaft))
+        g.add((op4, ON_PART, pe_handle))
+        g.add((op4, ON_PART, screw))
+        g.add((op4, ON_PART, PIN1))
 
     if type == "welding":
         pass
 
 
-def execute(num_processes, path):
+def execute(num_processes, num_classes, path):
     """
     Starts simulation of fixed number of production executions
     :param num_processes:
@@ -151,7 +160,7 @@ def execute(num_processes, path):
     """
     labels_mapping = dict()
     for i in xrange(0, num_processes):
-        g, label = generate_process(i)
+        g, label = generate_process(i, num_classes)
         rdffile = open(path + "\\execution_"+str(i)+"_.rdf", "w")
         labels_mapping[i] = label
         g.serialize(rdffile)
