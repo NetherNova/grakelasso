@@ -7,6 +7,7 @@ import numpy as np
 from collections import defaultdict
 from sklearn import cross_validation
 from simulation import ID
+from sklearn.metrics.pairwise import pairwise_kernels
 
 def read_file(filename, frequent=[]):
 	ret = []
@@ -143,7 +144,7 @@ def create_graph(filelist, output_train, output_test, pos_graphs, cv, predicate,
 					local_entity_counter = 0
 					local_entity_map = dict()
 					dfs_triples(entity_set, entity_map, edge_set, relation_map, g, o)
-					id = list(g.objects(o, ID))[0]
+					#id = list(g.objects(o, ID))[0]
 					tf.write("t")
 					tf.write("\n")
 					for (local_id, global_id) in sorted(entity_set, key=lambda x: x[0]):
@@ -163,7 +164,7 @@ def dfs_triples(entity_set, entity_map, edge_set, relation_map, graph, subject):
 	global local_entity_map
 	global id_to_uri
 
-	triples = graph.triples((subject, None, None))
+	triples = graph.triples((None, None, None))
 	for (s,p,o) in triples:
 		s_global = None
 		o_global = None
@@ -230,7 +231,7 @@ def dfs_triples(entity_set, entity_map, edge_set, relation_map, graph, subject):
 		entity_set.add( (s_local_id, s_id) )
 		entity_set.add( (o_local_id, o_id) )
 		edge_set.append((s_local_id, p_id, o_local_id))
-		dfs_triples(entity_set, entity_map, edge_set, relation_map, graph, o)
+		#dfs_triples(entity_set, entity_map, edge_set, relation_map, graph, o)
 
 
 def load_matlab(filename, key):
@@ -341,12 +342,14 @@ def parse_csv(filename):
 	return np.array(X)
 
 
-def preproscessing(database_train, class_index, labels_mapping):
+def preproscessing(database_train, class_index, labels_mapping, model):
 	graph_id_to_list_id = dict()
 	list_id_to_graph_id = dict()
 	n_graphs = len(database_train)
 	n_pos = 0
 	pos_index = []
+	L_hat = None
+	H = None
 
 	for i, graph in enumerate(database_train):
 		graph_id_to_list_id[graph.id] = i
@@ -358,33 +361,49 @@ def preproscessing(database_train, class_index, labels_mapping):
 	n_neg = n_graphs - n_pos
 	neg_index = np.array(1 - np.array(pos_index), dtype=bool)
 
-	W = np.zeros((n_graphs, n_graphs))
-	A = 0
-	B = 0
-	for i in xrange(0, n_graphs):
-		graph_id_i = list_id_to_graph_id[i]
-		for j in xrange(0, n_graphs):
-			graph_id_j = list_id_to_graph_id[j]
-			if labels_mapping[graph_id_i][class_index] != labels_mapping[graph_id_j][class_index]:
-				A += 1
-			if labels_mapping[graph_id_i][class_index] == labels_mapping[graph_id_j][class_index]:
-				B += 1
+	if model == "gMLC":
+		W = np.zeros((n_graphs, len(labels_mapping[1])))
+		H = np.zeros((n_graphs, n_graphs))
+		for i in xrange(0, n_graphs):
+			for j in xrange(0, n_graphs):
+				if i == j:
+					H[i,j] = 1 - (1.0 / n_graphs)
+				else:
+					H[i,j] = - (1.0 / n_graphs)
+		for i in xrange(0, n_graphs):
+			graph_id = list_id_to_graph_id[i]
+			labels_tmp = labels_mapping[graph_id]
+			for j, label in enumerate(labels_tmp):
+				W[i,j] = label
+		L = pairwise_kernels(W, metric="linear")
+	else:
+		W = np.zeros((n_graphs, n_graphs))
+		A = 0
+		B = 0
+		for i in xrange(0, n_graphs):
+			graph_id_i = list_id_to_graph_id[i]
+			for j in xrange(0, n_graphs):
+				graph_id_j = list_id_to_graph_id[j]
+				if labels_mapping[graph_id_i][class_index] != labels_mapping[graph_id_j][class_index]:
+					A += 1
+				if labels_mapping[graph_id_i][class_index] == labels_mapping[graph_id_j][class_index]:
+					B += 1
 
-	for i in xrange(0, n_graphs):
-		graph_id_i = list_id_to_graph_id[i]
-		for j in xrange(0, n_graphs):
-			graph_id_j = list_id_to_graph_id[j]
-			if labels_mapping[graph_id_i][class_index] == labels_mapping[graph_id_j][class_index]:
-				W[i, j] = 1.0 / A
-			else:
-				W[i, j] = -1.0 / B
+		for i in xrange(0, n_graphs):
+			graph_id_i = list_id_to_graph_id[i]
+			for j in xrange(0, n_graphs):
+				graph_id_j = list_id_to_graph_id[j]
+				if labels_mapping[graph_id_i][class_index] == labels_mapping[graph_id_j][class_index]:
+					W[i, j] = 1.0 / A
+				else:
+					W[i, j] = -1.0 / B
 
-	D = np.zeros((n_graphs, n_graphs))
-	for i in xrange(0, n_graphs):
-		D[i,i] = sum(W[i, ])
-	L = D - W
+		D = np.zeros((n_graphs, n_graphs))
+		for i in xrange(0, n_graphs):
+			D[i,i] = sum(W[i, ])
+		L = D - W
 
-	L_hat = np.copy(L)
-	L_hat[L_hat < 0] = 0
+		L_hat = np.copy(L)
+		L_hat[L_hat < 0] = 0
 
-	return L, L_hat, n_graphs, n_pos, n_neg, pos_index, neg_index, graph_id_to_list_id
+	return H, L, L_hat, n_graphs, n_pos, n_neg, pos_index, neg_index, graph_id_to_list_id

@@ -63,6 +63,12 @@ op6 = URIRef("http://www.siemens.com/ontology/demonstrator#Operation/Assembly2")
 op7 = URIRef("http://www.siemens.com/ontology/demonstrator#Operation/Finishing")
 process_uri = URIRef("http://www.siemens.com/ontology/demonstrator#Process")
 
+label_uris = dict({ 0: URIRef("http://www.siemens.com/ontology/demonstrator#Abnormality"),
+                    1: URIRef("http://www.siemens.com/ontology/demonstrator#WeldingTemperatureError"),
+                    2: URIRef("http://www.siemens.com/ontology/demonstrator#DoorWeldingQAFailure"),
+                    3: URIRef("http://www.siemens.com/ontology/demonstrator#SpecialPartScratchedQAFailure"),
+                    4: URIRef("http://www.siemens.com/ontology/demonstrator#SpecialPartShakyQAFailure"),
+                    5: URIRef("http://www.siemens.com/ontology/demonstrator#FrameFittingQAFailure")})
 
 def generate_process(id, num_classes):
     """
@@ -78,9 +84,11 @@ def generate_process(id, num_classes):
         # 4 = special part shaky qa fail, 5 = frame fitting qa fail }
         # correlation between 1-2-5 and 3-4
     # correlation between assigned equipment, product type, and failure (label)
-    if np.random.random() < 0.2:
-        label[0] = 1
+    if np.random.random() < 0.8:
         process(g, type="normal")
+    elif np.random.random() < 0.5:    # 10 percent cases a generic failure
+        label[0] = 1
+        process(g, type="generic")
     else:
         if np.random.random() < 0.5:
             process(g, type="welding")
@@ -131,8 +139,8 @@ def process(g, type):
         g.add((op4, ON_PART, screw))
         g.add((op4, ON_PART, PIN1))
 
-    if type == "special":
-        if np.random.random() < 0.2:
+    elif type == "generic":
+        if np.random.random() < 0.9:
             frame_picker = framepickerNew
         else:
             frame_picker = framepickerOld
@@ -147,8 +155,57 @@ def process(g, type):
         g.add((op4, ON_PART, screw))
         g.add((op4, ON_PART, PIN1))
 
-    if type == "welding":
-        pass
+    elif type == "special":
+        if np.random.random() < 0.2:
+            frame_picker = framepickerNew
+        else:
+            frame_picker = framepickerOld
+        g.add((op1, ON_PART, screw))
+        g.add((op1, USED_EQUIPMENT, frame_picker))
+        g.add((op1, HAS_FOLLOWER, op3))
+        g.add((op1, HAS_FOLLOWER, op4))
+        g.add((op3, ON_PART, iron_shaft))
+        g.add((op3, ON_PART, pe_handle))
+        g.add((op4, ON_PART, iron_shaft))
+        g.add((op4, ON_PART, pe_handle))
+        g.add((op4, ON_PART, screw))
+        g.add((op4, ON_PART, PIN1))
+        g.add((op4, HAS_FOLLOWER, op5))
+        g.add((op5, ON_PART, SPECIAL_PART))
+        if np.random.random() < 0.8:
+            g.add((SPECIAL_PART, HAS_PROPERTY, color_black))
+            g.add((op6, ON_PART, SPECIAL_PART))
+
+    elif type == "welding":
+        if np.random.random() < 0.2:
+            frame_picker = framepickerNew
+        else:
+            frame_picker = framepickerOld
+        if np.random.random() < 0.2:
+            welding_robo = robo1
+        else:
+            welding_robo = robo2
+        g.add((op1, ON_PART, screw))
+        g.add((op1, USED_EQUIPMENT, frame_picker))
+        g.add((op1, HAS_FOLLOWER, op3))
+        g.add((op1, HAS_FOLLOWER, op4))
+        g.add((op3, USED_EQUIPMENT, welding_robo))
+        if np.random.random() < 0.2:
+            program = program17
+        else:
+            program = program18
+        g.add((welding_robo,HAS_PROPERTY, program))
+        if np.random.random() < 0.8:
+            g.add((op4, USED_EQUIPMENT, welding_robo))
+        elif np.random.random() < 0.5:
+            g.add((op4, USED_EQUIPMENT, framepickerOld))
+            g.add((op4, ON_PART, PIN2))
+        g.add((op3, ON_PART, iron_shaft))
+        g.add((op3, ON_PART, pe_handle))
+        g.add((op4, ON_PART, iron_shaft))
+        g.add((op4, ON_PART, pe_handle))
+        g.add((op4, ON_PART, screw))
+        g.add((op4, ON_PART, PIN1))
 
 
 def execute(num_processes, num_classes, path):

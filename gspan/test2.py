@@ -18,25 +18,24 @@ from simulation import process_uri, framepickerNew, framepickerOld
 
 if __name__ == '__main__':
     np.random.seed(24)
-    num_processes = 50
-    min_sup = 0.02
+    num_processes = 500
+    min_sup = 0.005
     k_fold = 4
     num_classes = 6
     c1 = OneVsRestClassifier(svm.LinearSVC())
     c2 = OneVsRestClassifier(GaussianNB())
     c3 = OneVsRestClassifier(KNeighborsClassifier())
     names = ["Linear SVM", "Naive Bayes", "Nearest Neighbor"]
-    model = ["knowledge-graph", "top-k", "gMGFL"]
+    model = ["greedy", "top-k", "gMGFL"]
     path = "D:\\Dissertation\\Data Sets\\Manufacturing"
 
     labels_mapping = simulation.execute(num_processes, num_classes, path)
-    graph_entities = [framepickerNew, framepickerOld]
 
-    output_file_test = "D:\\Dissertation\\Data Sets\\Manufacturing\\test"
-    output_file_train = "D:\\Dissertation\\Data Sets\\Manufacturing\\train"
+    output_file_test = path + "\\test"
+    output_file_train = path + "\\train"
     filelist = []
     for i in xrange(0, num_processes):
-        filelist.append("D:\\Dissertation\\Data Sets\\Manufacturing\\execution_"+str(i)+"_.rdf")
+        filelist.append(path + "\\execution_"+str(i)+"_.rdf")
     id_to_uri, graph_labels_train, graph_labels_test = fileio.create_graph(filelist, output_file_train, output_file_test,
                                                                            labels_mapping, k_fold, RDF.type, process_uri)
 
@@ -64,17 +63,11 @@ if __name__ == '__main__':
 
                         labels = np.array(graph_labels_train[k])
                         tik = datetime.utcnow()
+                        H, L, L_hat, n_graphs, n_pos, n_neg, pos_index, neg_index, graph_id_to_list_id = fileio.preproscessing(database_train, class_index, labels_mapping, m)
 
-                        L, L_hat, n_graphs, n_pos, n_neg, pos_index, neg_index, graph_id_to_list_id = fileio.preproscessing(database_train, class_index, labels_mapping)
-
-                        X_train, pattern_set = gspan.project(database_train, freq, minsup, flabels, length, L, L_hat, n_graphs, n_pos, n_neg, pos_index, neg_index, graph_id_to_list_id,
+                        X_train, pattern_set = gspan.project(database_train, freq, minsup, flabels, length, H, L, L_hat, n_graphs, n_pos, n_neg, pos_index, neg_index, graph_id_to_list_id,
                                                              mapper = id_to_uri, labels = labels_mapping, model = m,
-                                                             constraints=cons, graph_entities = graph_entities)
-                        # matrix M = wie stark korrespondiert operation execution i mit exeuction j
-                        # constraints - welche beiden instanzen sollte man nicht vergleichen?
-                        # basierend auf distanz der labels und indikatoren der graph patterns
-                        # ähnlichkeit von patterns - so wie kernel im paper (ist aber nur dot-product kernel auf indicators)?
-                        # causation-artiger kernel k(G_i, G_j) = f_g_i  f_g_j
+                                                             constraints=cons)
                         tok = datetime.utcnow()
                         times.append((tok - tik).total_seconds())
                         X_train = np.array(X_train).T
@@ -86,10 +79,10 @@ if __name__ == '__main__':
                         clf = classifier
                         clf.fit(X_train, labels)
                         y_pred = clf.predict(X_test)
-                        labels = 1 - np.array(graph_labels_test[k])
+                        labels = np.array(graph_labels_test[k])
                         f1 = f1_score(labels, y_pred)
                         scores.append(f1)
-                        writer.writerow([length, np.average(scores), m , np.average(times), names[i]])
+                    writer.writerow([length, np.average(scores), m , np.average(times), names[i]])
                     print(scores)
 
 
