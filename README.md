@@ -1,3 +1,8 @@
+# Code Repository for Dissertation Algorithms
+
+# Knowledge Graph Constraints for Multi-Label Graph Classification
+The gspan module contains an implementation of the constrained gspan algorithm.
+
 # GraKeLasso (0.9)
 Welcome to the GraKeLasso repository 
 
