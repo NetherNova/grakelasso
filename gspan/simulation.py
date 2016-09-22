@@ -84,50 +84,72 @@ def generate_process(id, num_classes):
         # 4 = special part shaky qa fail, 5 = frame fitting qa fail }
         # correlation between 1-2-5 and 3-4
     # correlation between assigned equipment, product type, and failure (label)
-    if np.random.random() < 0.8:
-        process(g, type="normal")
-    elif np.random.random() < 0.5:    # 10 percent cases a generic failure
+    if np.random.random() < 0.5:
+        process(g, type="normal", stage=0)
+    elif np.random.random() < 0.2:    # 10 percent cases a generic failure
         label[0] = 1
-        process(g, type="generic")
+        process(g, type="generic", stage=0)
     else:
-        if np.random.random() < 0.5:
-            process(g, type="welding")
-            label[1] = 1
-            if np.random.random() < 0.8:
+        stage = 0
+        if np.random.random() < 0.7:
+            if np.random.random() < 0.5:
+                stage = 1
+                label[1] = 1
                 label[2] = 1
-            if np.random.random() < 0.8:
+            elif np.random.random() < 0.5:
+                stage = 2
+                label[2] = 1
                 label[5] = 1
+            elif np.random.random() < 0.2:
+                stage = 3
+                label[1] = 1
+                label[5] = 1
+            else:
+                stage = 4
+                label[1] = 1
+                label[2] = 1
+                label[5] = 1
+            process(g, type="welding", stage=stage)
         else:
-            process(g, type="special")
-            label[3] = 1
-            if np.random.random() < 0.8:
+            stage = 0
+            if np.random.random() < 0.5:
+                label[3] = 1
+                stage = 1
+            elif np.random.random() < 0.5:
                 label[4] = 1
+                stage = 2
+            else:
+                label[3] = 1
+                label[4] = 1
+                stage = 3
+            process(g, type="special", stage=stage)
     return g, label
 
-def process(g, type):
+def process(g, type, stage):
     g.add((process_uri, EXECUTED_OPERATION, op1))
-    if np.random.random() < 0.5:
-        screw = SCREW_DRIVER_A
-        if np.random.random() < 0.5:
-            iron_shaft = SHAFT_A
-            pe_handle = PE_BIG
-        else:
-            iron_shaft = SHAFT_B
-            pe_handle = PE_SMALL
-    else:
-        screw = SCREW_DRIVER_B
-        if np.random.random() < 0.5:
-            iron_shaft = SHAFT_A
-            pe_handle = PE_BIG
-        else:
-            iron_shaft = SHAFT_B
-            pe_handle = PE_SMALL
 
     if type == "normal":
-        if np.random.random() < 0.9:
+        if np.random.random() < 0.5:
             frame_picker = framepickerNew
         else:
             frame_picker = framepickerOld
+        if np.random.random() < 0.5:
+            screw = SCREW_DRIVER_A
+            if np.random.random() < 0.5:
+                iron_shaft = SHAFT_A
+                pe_handle = PE_BIG
+            else:
+                iron_shaft = SHAFT_B
+                pe_handle = PE_SMALL
+        else:
+            screw = SCREW_DRIVER_B
+        if np.random.random() < 0.5:
+            iron_shaft = SHAFT_A
+            pe_handle = PE_BIG
+        else:
+            iron_shaft = SHAFT_B
+            pe_handle = PE_SMALL
+        g.add((op1, ON_PART, SPECIAL_PART))
         g.add((op1, ON_PART, screw))
         g.add((op1, USED_EQUIPMENT, frame_picker))
         g.add((op1, HAS_FOLLOWER, op3))
@@ -136,14 +158,32 @@ def process(g, type):
         g.add((op3, ON_PART, pe_handle))
         g.add((op4, ON_PART, iron_shaft))
         g.add((op4, ON_PART, pe_handle))
-        g.add((op4, ON_PART, screw))
+        g.add((op1, HAS_PROPERTY, event1))
+        g.add((op1, HAS_PROPERTY, event2))
         g.add((op4, ON_PART, PIN1))
 
     elif type == "generic":
-        if np.random.random() < 0.9:
+        if np.random.random() < 0.5:
             frame_picker = framepickerNew
         else:
             frame_picker = framepickerOld
+        if np.random.random() < 0.4:
+            screw = SCREW_DRIVER_A
+            if np.random.random() < 0.6:
+                iron_shaft = SHAFT_A
+                pe_handle = PE_BIG
+            else:
+                iron_shaft = SHAFT_B
+                pe_handle = PE_SMALL
+        else:
+            screw = SCREW_DRIVER_B
+        if np.random.random() < 0.6:
+            iron_shaft = SHAFT_A
+            pe_handle = PE_BIG
+        else:
+            iron_shaft = SHAFT_B
+            pe_handle = PE_SMALL
+        g.add((op1, ON_PART, SPECIAL_PART2))
         g.add((op1, ON_PART, screw))
         g.add((op1, USED_EQUIPMENT, frame_picker))
         g.add((op1, HAS_FOLLOWER, op3))
@@ -152,61 +192,56 @@ def process(g, type):
         g.add((op3, ON_PART, pe_handle))
         g.add((op4, ON_PART, iron_shaft))
         g.add((op4, ON_PART, pe_handle))
-        g.add((op4, ON_PART, screw))
+        g.add((op1, HAS_PROPERTY, event1))
+        g.add((op1, HAS_PROPERTY, event2))
         g.add((op4, ON_PART, PIN1))
+        if np.random.random() < 0.5:
+            g.add((PIN1, HAS_PROPERTY, color_red))
+        else:
+            g.add((PIN1, HAS_PROPERTY, color_blue))
+        if np.random.random() < 0.5:
+            g.add((op4, HAS_FOLLOWER, op6))
 
     elif type == "special":
-        if np.random.random() < 0.2:
-            frame_picker = framepickerNew
-        else:
-            frame_picker = framepickerOld
+        frame_picker = framepickerNew
+        screw = SCREW_DRIVER_A
+        iron_shaft = SHAFT_A
+        pe_handle = PE_BIG
         g.add((op1, ON_PART, screw))
         g.add((op1, USED_EQUIPMENT, frame_picker))
-        g.add((op1, HAS_FOLLOWER, op3))
+        g.add((op1, HAS_FOLLOWER, op2))
         g.add((op1, HAS_FOLLOWER, op4))
-        g.add((op3, ON_PART, iron_shaft))
-        g.add((op3, ON_PART, pe_handle))
-        g.add((op4, ON_PART, iron_shaft))
-        g.add((op4, ON_PART, pe_handle))
-        g.add((op4, ON_PART, screw))
-        g.add((op4, ON_PART, PIN1))
-        g.add((op4, HAS_FOLLOWER, op5))
-        g.add((op5, ON_PART, SPECIAL_PART))
-        if np.random.random() < 0.8:
-            g.add((SPECIAL_PART, HAS_PROPERTY, color_black))
-            g.add((op6, ON_PART, SPECIAL_PART))
+        #g.add((op2, ON_PART, iron_shaft))
+        #g.add((op2, ON_PART, pe_handle))
+        #g.add((op1, ON_PART, PIN1))
+        g.add((op1, HAS_PROPERTY, event1))
+        g.add((op1, HAS_PROPERTY, event2))
+        g.add((op4, ON_PART, SPECIAL_PART))
+        if stage == 1:
+            g.add((screw, HAS_PROPERTY, color_black))
+        elif stage == 2:
+            g.add((screw, HAS_PROPERTY, color_blue))
+        elif stage == 3:
+            g.add((screw, HAS_PROPERTY, color_red))
 
     elif type == "welding":
-        if np.random.random() < 0.2:
-            frame_picker = framepickerNew
-        else:
-            frame_picker = framepickerOld
-        if np.random.random() < 0.2:
-            welding_robo = robo1
-        else:
-            welding_robo = robo2
+        frame_picker = framepickerOld
+        welding_robo = robo1
+        screw = SCREW_DRIVER_A
         g.add((op1, ON_PART, screw))
         g.add((op1, USED_EQUIPMENT, frame_picker))
-        g.add((op1, HAS_FOLLOWER, op3))
-        g.add((op1, HAS_FOLLOWER, op4))
-        g.add((op3, USED_EQUIPMENT, welding_robo))
-        if np.random.random() < 0.2:
-            program = program17
-        else:
-            program = program18
-        g.add((welding_robo,HAS_PROPERTY, program))
-        if np.random.random() < 0.8:
-            g.add((op4, USED_EQUIPMENT, welding_robo))
-        elif np.random.random() < 0.5:
-            g.add((op4, USED_EQUIPMENT, framepickerOld))
-            g.add((op4, ON_PART, PIN2))
-        g.add((op3, ON_PART, iron_shaft))
-        g.add((op3, ON_PART, pe_handle))
-        g.add((op4, ON_PART, iron_shaft))
-        g.add((op4, ON_PART, pe_handle))
-        g.add((op4, ON_PART, screw))
+        g.add((op1, HAS_FOLLOWER, op2))
+        g.add((op2, HAS_FOLLOWER, op4))
+        g.add((op1, USED_EQUIPMENT, welding_robo))
         g.add((op4, ON_PART, PIN1))
-
+        g.add((op1, HAS_PROPERTY, event1))
+        g.add((op1, HAS_PROPERTY, event2))
+        program = program17
+        g.add((welding_robo, HAS_PROPERTY, program))
+        if stage == 1:
+            g.add((op2, ON_PART, SPECIAL_PART))
+        elif stage == 2:
+            g.add((op2, ON_PART, SPECIAL_PART))
 
 def execute(num_processes, num_classes, path):
     """
@@ -224,3 +259,58 @@ def execute(num_processes, num_classes, path):
     mappingfile = open(path + "\\mapping.pickle", 'w')
     pickle.dump(labels_mapping, mappingfile)
     return labels_mapping
+
+def label_ml_cons(labels_mapping):
+    list_of_label_pairs = [(1,2), (2,5), (1,5), (3,4)]
+    list_of_ml_pairs = []
+    for i, item1 in enumerate(labels_mapping.items()):
+        labels1 = item1[1]
+        labels1 = labels1.nonzero()[0]
+        for j, item2 in enumerate(labels_mapping.items()):
+            if item1[0] == item2[0]:
+                continue
+            labels2 = item2[1]
+            labels2 = labels2.nonzero()[0]
+            add = True
+            one_diff = False
+            for label1 in labels1:
+                for label2 in labels2:
+                    if label1 == label2:
+                        continue # TODO: if all labels equal?
+                    one_diff = True
+                    if (label1, label2) not in list_of_label_pairs and (label2, label1) not in list_of_label_pairs:
+                        add = False
+                        break
+            if not add:
+                continue
+            if not one_diff:
+                continue
+            elif (item1[0], item2[0]) not in list_of_ml_pairs and (item2[0], item1[0]) not in list_of_ml_pairs:
+                list_of_ml_pairs.append((item1[0], item2[0]))
+    return list_of_ml_pairs
+
+def label_cl_cons(labels_mapping):
+    list_of_label_pairs = [(1,2), (2,5), (1,5), (3,4)]
+    list_of_cl_pairs = []
+    for i, item in enumerate(labels_mapping.items()):
+            labels1 = item[1]
+            labels1 = labels1.nonzero()[0]
+            for j, item2 in enumerate(labels_mapping.items()):
+                if item[0] == item2[0]:
+                    continue
+                labels2 = item2[1]
+                labels2 = labels2.nonzero()[0]
+                add = True
+                for label1 in labels1:
+                    for label2 in labels2:
+                        if label1 == label2:
+                            add = False
+                            break
+                        if (label1, label2) in list_of_label_pairs or (label2, label1) in list_of_label_pairs:
+                            add = False
+                            break
+                if not add:
+                    continue
+                elif (item[0], item2[0]) not in list_of_cl_pairs and (item2[0], item[0]) not in list_of_cl_pairs:
+                    list_of_cl_pairs.append((item[0], item2[0]))
+    return list_of_cl_pairs

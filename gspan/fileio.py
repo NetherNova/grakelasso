@@ -356,10 +356,13 @@ def preproscessing(database_train, class_index, labels_mapping, model):
 		list_id_to_graph_id[i] = graph.id
 		if labels_mapping[graph.id][class_index] == 1:
 			n_pos += 1
-			pos_index.append(i)
+			pos_index.append(1)
+		else:
+			pos_index.append(0)
 
 	n_neg = n_graphs - n_pos
 	neg_index = np.array(1 - np.array(pos_index), dtype=bool)
+	pos_index = np.array(pos_index, dtype=bool)
 
 	if model == "gMLC":
 		W = np.zeros((n_graphs, len(labels_mapping[1])))
@@ -407,3 +410,10 @@ def preproscessing(database_train, class_index, labels_mapping, model):
 		L_hat[L_hat < 0] = 0
 
 	return H, L, L_hat, n_graphs, n_pos, n_neg, pos_index, neg_index, graph_id_to_list_id
+
+
+def write_labels_mapping(labels_mapping, to_file):
+	with open(to_file, "w") as f:
+		writer = csv.writer(f)
+		for k in labels_mapping:
+			writer.writerow(list(labels_mapping[k]))

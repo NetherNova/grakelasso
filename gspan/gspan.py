@@ -461,7 +461,7 @@ def check_entity_in_pattern(e, pattern):
 # 
 # Generate initial edges and start the mining process
 #
-def project(database, frequent_nodes, minsup, freq_labels, length, H, L, L_hat, n_graphs, n_pos, n_neg, pos_index, neg_index, graph_id_to_list_id, mapper, labels, model, constraints, kg, label_uri):
+def project(database, frequent_nodes, minsup, freq_labels, length, H, L, L_hat, n_graphs, n_pos, n_neg, pos_index, class_index, neg_index, graph_id_to_list_id, mapper, labels, model, constraints):
 	global __subgraph_count
 	global __positive_index
 	global __n_pos
@@ -477,12 +477,44 @@ def project(database, frequent_nodes, minsup, freq_labels, length, H, L, L_hat, 
 	global __graph_id_to_list_id
 	global __neighbor_set
 
-	__ml_constraints = constraints[0]
-	__cl_constraints = constraints[1]
+	__graph_id_to_list_id = graph_id_to_list_id
+
+	__ml_constraints = [c for c in constraints[0] if c[0] < n_graphs and c[1] < n_graphs]
+	__cl_constraints = [c for c in constraints[1] if c[0] < n_graphs and c[1] < n_graphs]
+
+	for i, con in enumerate(__ml_constraints):
+		if not labels[con[0]][class_index] == 1:
+			__ml_constraints.remove((con[0], con[1]))
+
+	for i, con in enumerate(__cl_constraints):
+		if not labels[con[0]][class_index] == 1:
+			__cl_constraints.remove((con[0], con[1]))
+
+	for i, con in enumerate(__ml_constraints):
+		if con[0] >= n_graphs or con[1] >= n_graphs:
+			__ml_constraints.remove(con)
+			continue
+		try:
+			list_id1 = __graph_id_to_list_id[con[0]]
+			list_id2 = __graph_id_to_list_id[con[1]]
+			__ml_constraints[i] = (list_id1, list_id2)
+		except KeyError:
+			__ml_constraints.remove(con)
+
+	for i, con in enumerate(__cl_constraints):
+		if con[0] >= n_graphs or con[1] >= n_graphs:
+			__cl_constraints.remove(con)
+			continue
+		try:
+			list_id1 = __graph_id_to_list_id[con[0]]
+			list_id2 = __graph_id_to_list_id[con[1]]
+			__cl_constraints[i] = (list_id1, list_id2)
+		except KeyError:
+			__cl_constraints.remove(con)
 
 	__neighbor_set = set()
 
-	extract_label_neighbors(label_uri, kg, __neighbor_set, 0)
+	#extract_label_neighbors(label_uri, kg, __neighbor_set, 0)
 
 	__positive_index = pos_index
 	__negative_index = neg_index
@@ -491,7 +523,6 @@ def project(database, frequent_nodes, minsup, freq_labels, length, H, L, L_hat, 
 	__H = H
 	__L = L
 	__L_hat = L_hat
-	__graph_id_to_list_id = graph_id_to_list_id
 
 	__dataset = []
 	__pattern_set = []
@@ -697,13 +728,7 @@ def check_ml_constraints(vector):
 	global __ml_constraints
 
 	for con in __ml_constraints:
-		# TODO: lookups auslagern!
-		try:
-			list_id1 = __graph_id_to_list_id[con[0]]
-			list_id2 = __graph_id_to_list_id[con[1]]
-		except KeyError:
-			continue
-		if not (vector[list_id1] == vector[list_id2]):
+		if not (vector[con[0]] == vector[con[1]]):
 			return False
 	return True
 
@@ -711,13 +736,7 @@ def check_cl_constraints(vector):
 	global __cl_constraints
 
 	for con in __cl_constraints:
-		# TODO: lookups auslagern!
-		try:
-			list_id1 = __graph_id_to_list_id[con[0]]
-			list_id2 = __graph_id_to_list_id[con[1]]
-		except KeyError:
-			continue
-		if vector[list_id1] == 1 and vector[list_id2] == 1:
+		if vector[con[0]] == 1 and vector[con[1]] == 1:
 			return False
 	return True
 
@@ -736,7 +755,7 @@ def evaluate_and_prune(dfs_codes, mapper, projection, threshold, length, model):
 		min_index, threshold = get_min_q()
 		q_hat, vector = q(vector, hat=True)
 		if not ml:
-			return True, threshold
+			return False, threshold
 		if not cl:
 			return False, threshold
 		if get_length() < length or q_val > threshold:
@@ -753,7 +772,7 @@ def evaluate_and_prune(dfs_codes, mapper, projection, threshold, length, model):
 		n_support = count_support(projection)
 		min_index, threshold = get_min_freq()
 		if not ml:
-			return True, threshold
+			return False, threshold
 		if not cl:
 			return False, threshold
 		if get_length() < length or n_support > threshold:
@@ -770,7 +789,7 @@ def evaluate_and_prune(dfs_codes, mapper, projection, threshold, length, model):
 		q_val = greedy_value(vector)
 		min_index, threshold = get_min_greedy()
 		if not ml:
-			return True, threshold
+			return False, threshold
 		if not cl:
 			return False, threshold
 		if get_length() < length or q_val > threshold:
@@ -787,7 +806,7 @@ def evaluate_and_prune(dfs_codes, mapper, projection, threshold, length, model):
 		q_val = gmlc(vector)
 		min_index, threshold = get_min_gmlc()
 		if not ml:
-			return True, threshold
+			return False, threshold
 		if not cl:
 			return False, threshold
 		q_hat = gmlc(vector, hat=True)
@@ -844,78 +863,20 @@ def database_to_vector(database, pattern_set, mapper):
 				ret[i, j] = 1
 	return ret
 
+def database_statistics(database):
+	global_node_counter = 0
+	global_edge_counter = 0
+	n_graphs = 0
 
-def extract_label_neighbors(label_uri, kg, entity_set, depth):
-	"""
-	Returns a set of entities in the knowledge graph that are neighbors of the label entity
-	:param label_uri:
-	:return:
-	"""
-	if depth == 4:
-		return
-	objs = kg.triples((label_uri, None, None))
-	for s, p, o in objs:
-		entity_set.add(o)
-		extract_label_neighbors(o, kg, entity_set, depth + 1)
+	for i, g in enumerate(database):
+		for n in g.nodes:
+			global_node_counter += 1
+			for e in n.edges:
+				global_edge_counter += 1
+		n_graphs += 1
 
+	avg_node = float(global_node_counter) / n_graphs
+	avg_edge = float(global_edge_counter) / n_graphs
 
-def count_label_neighbors(pattern):
-	"""
-	Returns the size of the intersection of pattern entities and neighborset
-	:param neighborset:
-	:param pattern:
-	:return:
-	"""
-	global __neighbor_set
-	counter = 0
-	for triple in pattern:
-		if triple[0] in __neighbor_set or triple[1] in __neighbor_set:
-			counter += 1
-	return counter
+	return avg_node, avg_edge
 
-def path_features(X, y, pattern_set, kg):
-	"""
-	Enhance x_i, y_i by connecting each pattern through a defined path to entity x_j, y_j
-	:param X:
-	:param y:
-	:param pattern_set:
-	:param knowledge_graph:
-	:return:
-	"""
-	m = len(pattern_set)
-	visited_set = set()
-	patter_pattern = np.zeros((m, m))
-	# first pass through every combination
-	for i in xrange(m):
-		for j in xrange(i+1, m):
-			entity_list_i = list(kg.subjects(URIRef("http://lemon-model.net/lemon#writtenRep"), Literal(str(pattern_set[i][0][0]).split("#")[1], "eng")))
-			entity_list_j = list(kg.subjects(URIRef("http://lemon-model.net/lemon#writtenRep"), Literal(str(pattern_set[j][0][0]).split("#")[1], "eng")))
-			if path_search(kg, entity_list_i, entity_list_j, visited_set ,0):
-				pattern_pattern[i, j] = 1
-		# do same for labels
-		for j in xrange(y.shape[1]):
-			pass
-	# transform indicator matrix into augmented feature space (assess link strength / consistency according to links)
-	# Use MCMC Sampling to infer relation type parameter (normal prior? exploration?)
-
-def path_search(kg, entity_lsit_i, entity_list_j, visited_set, depth):
-	if depth == 4:
-		return False
-	for e in entity_lsit_i:
-		if e in visited_set:
-			continue
-		visited_set.add(e)
-		triples_forward = kg.triples((e, None, None))
-		triples_backward = kg.triples((None, None, e))
-		new_triple_list = []
-		for s,p,o in triples_forward:
-			if o in entity_list_j:
-				return True
-			new_triple_list.append(o)
-		path_search(kg, new_triple_list, entity_list_j, visited_set, depth+1)
-		new_triple_list = []
-		for s,p,o in triples_backward:
-			if o in entity_list_j:
-				return True
-			new_triple_list.append(o)
-		path_search(kg, new_triple_list, entity_list_j, visited_set, depth+1)

@@ -55,7 +55,7 @@ def extract_word_graphs(text_file, meta_file, out_path):
     docs = []
     inst_idx = 0
     movie_id_to_instance = dict()
-    max_lines = 200
+    max_lines = 500
     with open(text_file, "r") as f:
         for line in f:
             if inst_idx == max_lines:
@@ -225,7 +225,7 @@ def term_to_uri(term):
 
 def label_ml_cons(list_of_label_pairs, labels_mapping, label_uris):
     list_of_ml_pairs = []
-    for l1, l2 in list_of_label_pairs:
+    for i, (l1, l2) in enumerate(list_of_label_pairs):
         ind1 = None
         ind2 = None
         for k, v in label_uris.iteritems():
@@ -233,18 +233,37 @@ def label_ml_cons(list_of_label_pairs, labels_mapping, label_uris):
                 ind1 = k
             if l2 == str(v):
                 ind2 = k
-        for i, item in enumerate(labels_mapping.items()):
-            if item[1][ind1] == 1:
-                for j, item2 in enumerate(labels_mapping.items()):
-                    if i == j:
-                        continue
-                    if item2[1][ind2] == 1:
-                        list_of_ml_pairs.append((item[0], item2[0]))
+        list_of_label_pairs[i] = (ind1, ind2)
+    for i, item in enumerate(labels_mapping.items()):
+        labels1 = item[1]
+        labels1 = labels1.nonzero()[0]
+        for j, item2 in enumerate(labels_mapping.items()):
+            if item[0] == item2[0]:
+                continue
+            labels2 = item2[1]
+            labels2 = labels2.nonzero()[0]
+            add = True
+            one_diff = False
+            for label1 in labels1:
+                for label2 in labels2:
+                    if label1 == label2:
+                        continue # TODO: if all labels equal?
+                    one_diff = True
+                    if (label1, label2) not in list_of_label_pairs and (label2, label1) not in list_of_label_pairs:
+                        add = False
+                        break
+            if not add:
+                continue
+            if not one_diff:
+                continue
+            elif (item[0], item2[0]) not in list_of_ml_pairs and (item2[0], item[0]) not in list_of_ml_pairs:
+                list_of_ml_pairs.append((item[0], item2[0]))
     return list_of_ml_pairs
+
 
 def label_cl_cons(list_of_label_pairs, labels_mapping, label_uris):
     list_of_cl_pairs = []
-    for l1, l2 in list_of_label_pairs:
+    for i, (l1, l2) in enumerate(list_of_label_pairs):
         ind1 = None
         ind2 = None
         for k, v in label_uris.iteritems():
@@ -252,13 +271,29 @@ def label_cl_cons(list_of_label_pairs, labels_mapping, label_uris):
                 ind1 = k
             if l2 == str(v):
                 ind2 = k
+        list_of_label_pairs[i] = (ind1, ind2)
+        # Check every combination if there is not dependency
         for i, item in enumerate(labels_mapping.items()):
-            if item[1][ind1] == 1 or item[1][ind2] == 1:
-                for j, item2 in enumerate(labels_mapping.items()):
-                    if i == j:
-                        continue
-                    if item2[1][ind1] == 1 or item2[1][ind2] == 1:
-                        list_of_cl_pairs.append((item[0], item2[0]))
+            labels1 = item[1]
+            labels1 = labels1.nonzero()[0]
+            for j, item2 in enumerate(labels_mapping.items()):
+                if item[0] == item2[0]:
+                    continue
+                labels2 = item2[1]
+                labels2 = labels2.nonzero()[0]
+                add = True
+                for label1 in labels1:
+                    for label2 in labels2:
+                        if label1 == label2:
+                            add = False
+                            break
+                        if (label1, label2) in list_of_label_pairs or (label2, label1) in list_of_label_pairs:
+                            add = False
+                            break
+                if not add:
+                    continue
+                elif (item[0], item2[0]) not in list_of_cl_pairs and (item2[0], item[0]) not in list_of_cl_pairs:
+                    list_of_cl_pairs.append((item[0], item2[0]))
     return list_of_cl_pairs
 
 if __name__ == '__main__':
