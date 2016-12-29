@@ -3,7 +3,7 @@
 class Edge():
 	def __init__(self):
 		self.id = None
-                self.fromn = None
+		self.fromn = None
 		self.to = None
 		self.label = None
 

@@ -23,6 +23,7 @@ def extract_word_graphs(text_file, meta_file, out_path):
     label_counter = 0
     label_mappings = dict()
     label_id_to_freebase = dict()
+    # get labels list (genres) for each movie
     with open(meta_file, "r") as f_meta:
         for line in f_meta:
             genres = line.split("\t")[8]
@@ -41,15 +42,15 @@ def extract_word_graphs(text_file, meta_file, out_path):
                 label_stripped = label.strip()
                 if label_stripped not in restricted_label_list:
                     continue
-                try:
+                if label_stripped in unique_labels:
                     label_id = unique_labels[label_stripped]
-                except KeyError:
+                else:
                     unique_labels[label_stripped] = label_counter
                     label_id = label_counter
                     label_counter += 1
-                try:
+                if label_id in label_id_to_freebase:
                     test_freebase = label_id_to_freebase[label_id]
-                except KeyError:
+                else:
                     label_id_to_freebase[label_id] = freebase_id_stripped
                 label_list.append(label_id)
             genres_dict[m_id] = label_list

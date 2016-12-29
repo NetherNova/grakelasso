@@ -11,6 +11,7 @@ logging.basicConfig(level=logging.WARNING)
 
 TOLERANCE = 0.001
 
+
 class GraKeLasso(object):
     """
     A Lasso regression with laplacian regularization

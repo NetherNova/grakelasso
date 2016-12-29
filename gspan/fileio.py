@@ -9,6 +9,7 @@ from sklearn import cross_validation
 from simulation import ID
 from sklearn.metrics.pairwise import pairwise_kernels
 
+
 def read_file(filename, frequent=[]):
 	"""
 	Parse graph file space-delimited .txt
