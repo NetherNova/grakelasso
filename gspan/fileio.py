@@ -10,8 +10,13 @@ from simulation import ID
 from sklearn.metrics.pairwise import pairwise_kernels
 
 def read_file(filename, frequent=[]):
+	"""
+	Parse graph file space-delimited .txt
+	:param filename:
+	:param frequent: ignore the in-frequent label nodes
+	:return:
+	"""
 	ret = []
-
 	count = 0
 	id_map = {}
 	node_id = 0
@@ -76,10 +81,22 @@ def read_file(filename, frequent=[]):
 	ret.append(g)
 	return ret
 
+
 global entity_counter
 global relation_counter
 
 def create_graph(filelist, output_train, output_test, pos_graphs, cv, predicate, ob):
+	"""
+
+	:param filelist:
+	:param output_train:
+	:param output_test:
+	:param pos_graphs:
+	:param cv:
+	:param predicate:
+	:param ob:
+	:return:
+	"""
 	global relation_counter
 	relation_counter = 1000000
 	global entity_counter
@@ -348,6 +365,7 @@ def preproscessing(database_train, class_index, labels_mapping, model):
 	n_graphs = len(database_train)
 	n_pos = 0
 	pos_index = []
+	L = None
 	L_hat = None
 	H = None
 
@@ -379,6 +397,8 @@ def preproscessing(database_train, class_index, labels_mapping, model):
 			for j, label in enumerate(labels_tmp):
 				W[i,j] = label
 		L = pairwise_kernels(W, metric="linear")
+	elif model == "top-k":
+		return H, L, L_hat, n_graphs, n_pos, n_neg, pos_index, neg_index, graph_id_to_list_id
 	else:
 		W = np.zeros((n_graphs, n_graphs))
 		A = 0

@@ -4,6 +4,7 @@ from sklearn.feature_extraction.text import CountVectorizer
 from rdflib import ConjunctiveGraph, URIRef, RDF, BNode, Literal
 import numpy as np
 import pickle
+import fileio
 
 link = URIRef("http://pub.com#link")
 movie = URIRef("http://pub.com#movie")
@@ -14,6 +15,7 @@ plays = URIRef("http://pub.com#plays")
 
 restricted_label_list = ["Crime Fiction", "Mystery", "Horror", "Science Fiction", "Thriller", "Drama", "Romantic comedy",
                          "Romance Film", "Comedy", "Black comedy"]
+
 
 def extract_word_graphs(text_file, meta_file, out_path):
     genres_dict = dict()
@@ -55,14 +57,19 @@ def extract_word_graphs(text_file, meta_file, out_path):
     docs = []
     inst_idx = 0
     movie_id_to_instance = dict()
-    max_lines = 500
+    to_skip = 0
+    max_lines = 1500
+    line_count = 0
+    # test that every instance has at least one label
     with open(text_file, "r") as f:
         for line in f:
-            if inst_idx == max_lines:
+            line_count += 1
+            if line_count < to_skip:
+                continue
+            if inst_idx >= max_lines:
                 break
             id, text = line.split("\t")
             movie_id_to_instance[id.strip()] = inst_idx
-            docs.append(text)
             try:
                 genre_list = genres_dict[id]
             except KeyError:
@@ -70,16 +77,24 @@ def extract_word_graphs(text_file, meta_file, out_path):
             class_vector = np.zeros(num_classes)
             for g in genre_list:
                 class_vector[g] = 1
+            if np.all(class_vector == 0):
+                continue
             label_mappings[inst_idx] = class_vector
+            docs.append(text)
             inst_idx += 1
     pickle.dump(label_mappings, open(out_path + "\\label_mappings.pickle", "w"))
-    count_model = CountVectorizer(ngram_range=(1,1), min_df=8, stop_words="english", max_df=1500)
+    count_model = CountVectorizer(ngram_range=(1,1), min_df=5, stop_words="english", max_df=1500)
     count_model.fit(docs)
     #X = csr_matrix(count_model.fit_transform(docs))
     num_inst = len(docs)
     for i in xrange(num_inst):
         convert_to_graph(docs[i], i, count_model, out_path)
+    pickle.dump(unique_labels, open(out_path + "\\unique_labels.pickle", "w"))
     return unique_labels
+
+
+def load_labels(path):
+    return pickle.load(open(path + "\\unique_labels.pickle", "r"))
 
 
 def extract_actor_graph(character_file, meta_file, out_path):
@@ -223,78 +238,46 @@ def term_to_uri(term):
         return URIRef(base_uri + term.lower() + "-n")
 
 
-def label_ml_cons(list_of_label_pairs, labels_mapping, label_uris):
-    list_of_ml_pairs = []
-    for i, (l1, l2) in enumerate(list_of_label_pairs):
-        ind1 = None
-        ind2 = None
-        for k, v in label_uris.iteritems():
-            if l1 == str(v):
-                ind1 = k
-            if l2 == str(v):
-                ind2 = k
-        list_of_label_pairs[i] = (ind1, ind2)
-    for i, item in enumerate(labels_mapping.items()):
-        labels1 = item[1]
-        labels1 = labels1.nonzero()[0]
-        for j, item2 in enumerate(labels_mapping.items()):
-            if item[0] == item2[0]:
-                continue
-            labels2 = item2[1]
-            labels2 = labels2.nonzero()[0]
-            add = True
-            one_diff = False
-            for label1 in labels1:
-                for label2 in labels2:
-                    if label1 == label2:
-                        continue # TODO: if all labels equal?
-                    one_diff = True
-                    if (label1, label2) not in list_of_label_pairs and (label2, label1) not in list_of_label_pairs:
-                        add = False
-                        break
-            if not add:
-                continue
-            if not one_diff:
-                continue
-            elif (item[0], item2[0]) not in list_of_ml_pairs and (item2[0], item[0]) not in list_of_ml_pairs:
-                list_of_ml_pairs.append((item[0], item2[0]))
-    return list_of_ml_pairs
+def dump_file(data, path, file):
+    pickle.dump(data, open(path + "\\" + file, "w"))
 
 
-def label_cl_cons(list_of_label_pairs, labels_mapping, label_uris):
-    list_of_cl_pairs = []
-    for i, (l1, l2) in enumerate(list_of_label_pairs):
-        ind1 = None
-        ind2 = None
-        for k, v in label_uris.iteritems():
-            if l1 == str(v):
-                ind1 = k
-            if l2 == str(v):
-                ind2 = k
-        list_of_label_pairs[i] = (ind1, ind2)
-        # Check every combination if there is not dependency
-        for i, item in enumerate(labels_mapping.items()):
-            labels1 = item[1]
-            labels1 = labels1.nonzero()[0]
-            for j, item2 in enumerate(labels_mapping.items()):
-                if item[0] == item2[0]:
-                    continue
-                labels2 = item2[1]
-                labels2 = labels2.nonzero()[0]
-                add = True
-                for label1 in labels1:
-                    for label2 in labels2:
-                        if label1 == label2:
-                            add = False
-                            break
-                        if (label1, label2) in list_of_label_pairs or (label2, label1) in list_of_label_pairs:
-                            add = False
-                            break
-                if not add:
-                    continue
-                elif (item[0], item2[0]) not in list_of_cl_pairs and (item2[0], item[0]) not in list_of_cl_pairs:
-                    list_of_cl_pairs.append((item[0], item2[0]))
-    return list_of_cl_pairs
+def dump_meta_data(path, id_to_uri, graph_labels_train, graph_labels_test):
+    dump_file(id_to_uri, path, "\\id_to_uri.pickle")
+    dump_file(graph_labels_train, path, "\\graph_labels_train.pickle")
+    dump_file(graph_labels_test, path, "\\graph_labels_test.pickle")
+
+
+def load_meta_data(path):
+    id_to_uri = pickle.load(open(path + "\\id_to_uri.pickle", "r"))
+    graph_labels_train = pickle.load(open(path + "\\graph_labels_train.pickle", "r"))
+    graph_labels_test = pickle.load(open(path + "\\graph_labels_test.pickle", "r"))
+    return id_to_uri, graph_labels_train, graph_labels_test
+
+
+def prepare_training_files(path, k_fold):
+    print("Extracting RDF from text...")
+    unique_labels = extract_word_graphs(path + "\\plot_summaries.txt", path + "\\movie.metadata.tsv", path)
+    labels_mapping, num_classes, num_instances = load_mappings(path)
+    filelist = []
+    print "Creating %s simple graphs..." % (str(num_instances))
+    output_file_test = path + "\\test"
+    output_file_train = path + "\\train"
+    for i in xrange(0, num_instances):
+        filelist.append(path + "\\movie_"+str(i)+"_.rdf")
+    id_to_uri, graph_labels_train, graph_labels_test = fileio.create_graph(filelist, output_file_train, output_file_test,
+                                                                           labels_mapping, k_fold, RDF.type, movie)
+    dump_meta_data(path, id_to_uri, graph_labels_train, graph_labels_test)
+    print "Dumped %s entity training and test files for %s folds" % (str(movie), str(k_fold))
+
+
+def load_training(path):
+    id_to_uri, graph_labels_train, graph_labels_test = load_meta_data(path)
+    labels_mapping, num_classes, num_instances = load_mappings(path)
+    unique_labels = load_labels(path)
+    label_uris = transform_labels_to_uris(unique_labels)
+    return id_to_uri, graph_labels_train, graph_labels_test, unique_labels, label_uris, labels_mapping, num_classes
+
 
 if __name__ == '__main__':
     text_file = "D:\\Dissertation\\Data Sets\\Movies\\MovieSummaries\\plot_summaries.txt"

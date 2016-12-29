@@ -94,12 +94,12 @@ if __name__ == '__main__':
                                 #    break
                             tok = datetime.utcnow()
                             times.append((tok - tik).total_seconds())
-                            X_train = gspan.database_to_vector(database_train, pattern_set_global, id_to_uri)
+                            X_train = gspan.database_to_matrix(database_train, pattern_set_global, id_to_uri)
                             print("Features: " + str(len(X_train[1, :])))
                             for p in pattern_set_global:
                                 print p
                             database_test = fileio.read_file(test_file)
-                            X_test = gspan.database_to_vector(database_test, pattern_set_global, id_to_uri)
+                            X_test = gspan.database_to_matrix(database_test, pattern_set_global, id_to_uri)
                             for i, classifier in enumerate([c1, c2, c3]):
                                 clf = classifier
                                 clf.fit(X_train, train_labels)
