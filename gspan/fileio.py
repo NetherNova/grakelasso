@@ -8,7 +8,9 @@ from collections import defaultdict
 from sklearn import cross_validation
 from simulation import ID
 from sklearn.metrics.pairwise import pairwise_kernels
+import logging
 
+logging.basicConfig(level=logging.WARNING)
 
 def read_file(filename, frequent=[]):
 	"""
@@ -85,6 +87,8 @@ def read_file(filename, frequent=[]):
 
 global entity_counter
 global relation_counter
+
+# TODO: switch to nx maybe for intermediate instance graph generation?
 
 def create_graph(filelist, output_train, output_test, pos_graphs, cv, predicate, ob):
 	"""
@@ -174,6 +178,7 @@ def create_graph(filelist, output_train, output_test, pos_graphs, cv, predicate,
 			graph_labels_list_tmp.append(graph_labels_tmp)
 		i_fold += 1
 	return id_to_uri, graph_labels_train, graph_labels_test
+
 
 def dfs_triples(entity_set, entity_map, edge_set, relation_map, graph, subject):
 	global relation_counter
@@ -360,7 +365,7 @@ def parse_csv(filename):
 	return np.array(X)
 
 
-def preproscessing(database_train, class_index, labels_mapping, model):
+def preprocessing(database_train, class_index, labels_mapping, model):
 	graph_id_to_list_id = dict()
 	list_id_to_graph_id = dict()
 	n_graphs = len(database_train)

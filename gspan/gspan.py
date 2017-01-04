@@ -6,6 +6,9 @@ import numpy as np
 from rdflib import URIRef, ConjunctiveGraph, Literal
 import sys
 from sklearn.metrics.pairwise import pairwise_kernels
+import logging
+
+logging.basicConfig(level=logging.WARNING)
 
 __subgraph_count = 0
 """
@@ -834,7 +837,7 @@ def evaluate_and_prune(dfs_codes, mapper, projection, threshold, max_length, mod
 		prune_eval = gmlc(vector, hat=True)
 		min_index, threshold  = get_min(gmlc)
 	else:
-		print("Model %s not recognized") %(model)
+		logging.log(logging.ERROR, "Model %s not recognized" %(model))
 		exit(0)
 	# evaluate current pattern set
 	if dataset_length < max_length or add_eval > threshold:

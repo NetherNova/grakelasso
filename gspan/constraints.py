@@ -1,7 +1,9 @@
 __author__ = 'martin'
 
 import numpy as np
+import logging
 
+logging.basicConfig(level=logging.WARNING)
 
 # TODO: create constraints from (rdf)-graph
 
@@ -18,7 +20,7 @@ def map_label_pair_to_ids(label1, label2, label_uris):
 
 
 def label_ml_cons(list_of_label_pairs, labels_mapping, label_uris):
-    """ML-constraint holds if all labels share a link or common ancestor"""
+    """ML-constraint holds if all labels share a link"""
     set_of_ml_pairs = set()
     set_of_label_pairs = set()
     for i, (l1, l2) in enumerate(list_of_label_pairs):
@@ -75,7 +77,7 @@ def label_ml_cons_new(list_of_label_pairs, labels_mapping, label_uris, relax_coe
 
 
 def label_cl_cons(list_of_label_pairs, labels_mapping, label_uris):
-    """ML-constraint holds if all labels share a link or common ancestor"""
+    """CL-constraint holds if no labels share a link"""
     set_of_cl_pairs = set()
     set_of_label_pairs = set()
     for i, (l1, l2) in enumerate(list_of_label_pairs):
@@ -108,7 +110,7 @@ def label_cl_cons(list_of_label_pairs, labels_mapping, label_uris):
 
 
 def label_cl_cons_new(list_of_label_pairs, labels_mapping, label_uris, relax_coeff):
-    """ML-constraint holds if all labels share a link or common ancestor"""
+    """CL-constraint holds if no labels share a link """
     set_of_cl_pairs = set()
     set_of_label_pairs = set()
     for i, (l1, l2) in enumerate(list_of_label_pairs):

@@ -199,13 +199,12 @@ def convert_to_graph(words, index, count_model, path):
     prev_index = 0
     for i, w in enumerate(word_list):
         if w in count_model.vocabulary_:
-            word_uri = term_to_uri(w)
+            word_uri = term_to_wordnet_uri(w)
             if prev_word is not None and i - prev_index < 3:
                 #g.add((movie, link, word_uri))
                 g.add((prev_word, link, word_uri))
             prev_word = word_uri
             prev_index = i
-    g.serialize(path + "\\movie_" + str(index) + "_.rdf")
 
 
 def load_mappings(path):
@@ -218,11 +217,11 @@ def load_mappings(path):
 def transform_labels_to_uris(unique_labels):
     label_uris = dict()
     for k, v in unique_labels.items():
-        label_uris[v] = term_to_uri(k)
+        label_uris[v] = term_to_wordnet_uri(k)
     return label_uris
 
 
-def term_to_uri(term):
+def term_to_wordnet_uri(term):
     base_uri = "http://wordnet-rdf.princeton.edu/wn31/"
     list_of_words = term.split()
     num_words = len(list_of_words)

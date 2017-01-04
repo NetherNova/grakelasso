@@ -254,25 +254,18 @@ class ModelManager(object):
 
     def get_all_features_except_response(self, response, instance_index, laplacian=None):
         logging.info("Getting all features, except: %s", response)
-        X = None
+        X = []
+        itervalues = None
         if laplacian is None:
-            for f in self.data.columns.values:
-                if f == response:
-                    continue
-                elif X is None:
-                    X = self.data.ix[instance_index, f]
-                else:
-                    X = pd.concat([X, self.data.ix[instance_index, f]], axis=1)
-            return X
+            itervalues = self.data.columns.values
         else:
-            for f in laplacian.columns.values:
-                if f == response:
-                    continue
-                elif X is None:
-                    X = self.data.ix[instance_index, f]
-                else:
-                    X = pd.concat([X, self.data.ix[instance_index, f]], axis=1)
-            return X
+            itervalues = laplacian.columns.values
+        for f in itervalues:
+            if f == response:
+                continue
+            else:
+                X.append(self.data.ix[instance_index, f])
+        return pd.DataFrame(np.array(X).transpose())
 
     def get_data(self):
         return self.data

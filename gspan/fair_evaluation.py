@@ -158,7 +158,7 @@ if __name__ == '__main__':
                         if m == "top-k":
                             class_index = 0
                             tik = datetime.utcnow()
-                            H, L, L_hat, n_graphs, n_pos, n_neg, pos_index, neg_index, graph_id_to_list_id = fileio.preproscessing(database_train, class_index, labels_mapping, m)
+                            H, L, L_hat, n_graphs, n_pos, n_neg, pos_index, neg_index, graph_id_to_list_id = fileio.preprocessing(database_train, class_index, labels_mapping, m)
                             X_train, pattern_set_global = gspan.project(database_train, freq, minsup, flabels, length, H,
                                                                         L, L_hat, n_graphs, n_pos, n_neg, pos_index, class_index, neg_index, graph_id_to_list_id,
                                                                         mapper=id_to_uri, labels=labels_mapping, model=m,
@@ -192,7 +192,7 @@ if __name__ == '__main__':
                                 tik = datetime.utcnow()
                                 label_uri = label_uris[class_index]
 
-                                H, L, L_hat, n_graphs, n_pos, n_neg, pos_index, neg_index, graph_id_to_list_id = fileio.preproscessing(database_train, class_index, labels_mapping, m)
+                                H, L, L_hat, n_graphs, n_pos, n_neg, pos_index, neg_index, graph_id_to_list_id = fileio.preprocessing(database_train, class_index, labels_mapping, m)
                                 X_train, pattern_set_global = gspan.project(database_train, freq, minsup, flabels, length, H,
                                                                             L, L_hat, n_graphs, n_pos, n_neg, pos_index, class_index, neg_index, graph_id_to_list_id,
                                                                             mapper=id_to_uri, labels=labels_mapping, model=m,

@@ -58,7 +58,7 @@ def run_model_experiment(path, model, cons, k_fold, min_sup, clfs, names, max_pa
     :param q:
     :return:
     """
-    print("Running experiment %s..." % (model))
+    print "Running experiment %s..." % (model)
     id_to_uri, train_labels_all, test_labels_all, unique_labels, label_uris, labels_mapping, num_classes = load_training(path)
     scores_combined = dict()
     times = []
@@ -78,7 +78,7 @@ def run_model_experiment(path, model, cons, k_fold, min_sup, clfs, names, max_pa
         if model != "top-k":
             results = dict()
             for class_index in xrange(num_classes):
-                H, L, L_hat, n_graphs, n_pos, n_neg, pos_index, neg_index, graph_id_to_list_id = fileio.preproscessing(database_train, class_index, labels_mapping, model)
+                H, L, L_hat, n_graphs, n_pos, n_neg, pos_index, neg_index, graph_id_to_list_id = fileio.preprocessing(database_train, class_index, labels_mapping, model)
                 tik = datetime.utcnow()
                 X_train, pattern_set = gspan.project(database_train, freq, minsup, flabels, max_pattern_num, H, L, L_hat,
                                                  n_graphs, n_pos, n_neg, pos_index, class_index, neg_index,
@@ -104,7 +104,7 @@ def run_model_experiment(path, model, cons, k_fold, min_sup, clfs, names, max_pa
         else:
                 # special case top-k
                 class_index = 0
-                H, L, L_hat, n_graphs, n_pos, n_neg, pos_index, neg_index, graph_id_to_list_id = fileio.preproscessing(database_train, class_index, labels_mapping, model)
+                H, L, L_hat, n_graphs, n_pos, n_neg, pos_index, neg_index, graph_id_to_list_id = fileio.preprocessing(database_train, class_index, labels_mapping, model)
                 tik = datetime.utcnow()
                 X_train, pattern_set = gspan.project(database_train, freq, minsup, flabels, max_pattern_num, H, L, L_hat,
                                                  n_graphs, n_pos, n_neg, pos_index, class_index, neg_index,
@@ -129,7 +129,7 @@ def run_model_experiment(path, model, cons, k_fold, min_sup, clfs, names, max_pa
 
 def evaluate_binary_split(train, train_labels, test, clfs, names, class_index):
     if len(names) != len(clfs):
-        print("Classifiers and Names must match")
+        print "Classifiers and Names must match"
         exit(0)
     results = {}
     # initialize classifier predictions with empty lists
@@ -144,7 +144,7 @@ def evaluate_binary_split(train, train_labels, test, clfs, names, class_index):
 
 def evaluate_multilabel(train, train_labels, test, test_labels, clfs, names, average_method='weighted'):
     if len(names) != len(clfs):
-        print("Classifiers and Names must match")
+        print "Classifiers and Names must match"
         exit(0)
     scores = {}
     # initialize classifier predictions with empty lists
@@ -184,7 +184,7 @@ if __name__ == '__main__':
 
     models = ["top-k", "greedy", "gMGFL"]
     cons = ([], [])
-    min_sup = 0.0
+    min_sup = 0.02
     max_p_num = 1000
     for model in models:
         p = mp.Process(target=run_model_experiment, args=(path, model, cons, k_fold, min_sup, clfs, names, max_p_num, q,))
