@@ -73,13 +73,14 @@ def read_file(filename, frequent=[]):
 			e.label = label
 
 			g.nodes[e.fromn].edges.append(e)
-
+			"""
 			e2 = graph.Edge()
 			e2.fromn = e.to
 			e2.to = e.fromn
 			e2.label = e.label
 			e2.id = e.id
-			g.nodes[e.to].edges.append(e2)		
+			g.nodes[e.to].edges.append(e2)
+			"""
 
 	ret.append(g)
 	return ret

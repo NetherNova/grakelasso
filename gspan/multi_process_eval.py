@@ -14,7 +14,7 @@ from sklearn.cross_validation import StratifiedShuffleSplit
 from sklearn.grid_search import GridSearchCV
 from rdflib import URIRef, RDF, ConjunctiveGraph
 from sklearn.multiclass import OneVsRestClassifier
-from movieetl import load_training, prepare_training_files
+from movieetl import load_training_files, prepare_training_files
 from constraints import label_ml_cons_new, label_cl_cons, label_cl_cons_new
 import pickle
 import multiprocessing as mp
@@ -31,7 +31,7 @@ def result_write_listener(path, q):
     :param q:
     :return:
     """
-    print("Writer has started...")
+    print "Writer process started..."
     now = datetime.now()
     with open(path + "\\classifiers_movies" + now.strftime("%Y-%m-%d") + ".csv", "w") as f:
         writer = csv.writer(f)
@@ -39,6 +39,7 @@ def result_write_listener(path, q):
         while True:
             m = q.get()
             if m == 'kill':
+                # kill the process
                 break
             writer.writerow(m)
 
@@ -59,7 +60,8 @@ def run_model_experiment(path, model, cons, k_fold, min_sup, clfs, names, max_pa
     :return:
     """
     print "Running experiment %s..." % (model)
-    id_to_uri, train_labels_all, test_labels_all, unique_labels, label_uris, labels_mapping, num_classes = load_training(path)
+    mapper, train_labels_all, test_labels_all, unique_labels, label_uris, labels_mapping, num_classes = \
+        load_training_files(path)
     scores_combined = dict()
     times = []
     pattern_lengths = []
@@ -78,19 +80,20 @@ def run_model_experiment(path, model, cons, k_fold, min_sup, clfs, names, max_pa
         if model != "top-k":
             results = dict()
             for class_index in xrange(num_classes):
-                H, L, L_hat, n_graphs, n_pos, n_neg, pos_index, neg_index, graph_id_to_list_id = fileio.preprocessing(database_train, class_index, labels_mapping, model)
+                H, L, L_hat, n_graphs, n_pos, n_neg, pos_index, neg_index, graph_id_to_list_id = \
+                    fileio.preprocessing(database_train, class_index, labels_mapping, model)
                 tik = datetime.utcnow()
                 X_train, pattern_set = gspan.project(database_train, freq, minsup, flabels, max_pattern_num, H, L, L_hat,
                                                  n_graphs, n_pos, n_neg, pos_index, class_index, neg_index,
-                                                 graph_id_to_list_id, mapper=id_to_uri, labels=labels_mapping, model=model,
+                                                 graph_id_to_list_id, mapper=mapper, labels=labels_mapping, model=model,
                                                  constraints=cons)
                 tok = datetime.utcnow()
                 times.append((tok - tik).total_seconds())
                 pattern_length = len(pattern_set)
                 pattern_lengths.append(pattern_length)
-                X_train = gspan.database_to_matrix(database_train, pattern_set, id_to_uri)
+                X_train = gspan.database_to_matrix(database_train, pattern_set, mapper)
                 database_test = fileio.read_file(test_file)
-                X_test = gspan.database_to_matrix(database_test, pattern_set, id_to_uri)
+                X_test = gspan.database_to_matrix(database_test, pattern_set, mapper)
                 test_labels = np.array(test_labels_all[k])
                 results_class = evaluate_binary_split(X_train, train_labels, X_test, clfs, names, class_index)
                 results = merge_dicts(results_class, results)
@@ -108,16 +111,16 @@ def run_model_experiment(path, model, cons, k_fold, min_sup, clfs, names, max_pa
                 tik = datetime.utcnow()
                 X_train, pattern_set = gspan.project(database_train, freq, minsup, flabels, max_pattern_num, H, L, L_hat,
                                                  n_graphs, n_pos, n_neg, pos_index, class_index, neg_index,
-                                                 graph_id_to_list_id, mapper=id_to_uri, labels=labels_mapping, model=model,
+                                                 graph_id_to_list_id, mapper=mapper, labels=labels_mapping, model=model,
                                                  constraints=cons)
                 tok = datetime.utcnow()
                 times.append((tok - tik).total_seconds())
                 pattern_length = len(pattern_set)
                 print "%s Number of features: %s" % (model, pattern_length)
                 pattern_lengths.append(pattern_length)
-                X_train = gspan.database_to_matrix(database_train, pattern_set, id_to_uri)
+                X_train = gspan.database_to_matrix(database_train, pattern_set, mapper)
                 database_test = fileio.read_file(test_file)
-                X_test = gspan.database_to_matrix(database_test, pattern_set, id_to_uri)
+                X_test = gspan.database_to_matrix(database_test, pattern_set, mapper)
                 test_labels = np.array(test_labels_all[k])
                 scores = evaluate_multilabel(X_train, train_labels, X_test, test_labels, clfs, names)
         scores_combined = merge_dicts(scores, scores_combined)

@@ -7,18 +7,20 @@ from gspan import fileio
 import numpy as np
 
 
-graphs = fileio.read_file("..\\data\\testgraph.txt")
+class GspanTestCase(unittest.TestCase):
+    def setUp(self):
+        self.graphs = fileio.read_file("..\\data\\testgraph.txt")
 
 
-class GraphInstancesTest(unittest.TestCase):
-    def test(self):
-        self.assertEqual(len(graphs), 5)
-        self.assertTrue(graphs[0].id == 0)
-        self.assertTrue(graphs[1].id == 1)
+class GraphInstancesTest(GspanTestCase):
+    def test_io(self):
+        self.assertEqual(len(self.graphs), 5)
+        self.assertTrue(self.graphs[0].id == 0)
+        self.assertTrue(self.graphs[1].id == 1)
 
 
-class ConstraintsTest(unittest.TestCase):
-    def test(self):
+class ConstraintsTest(GspanTestCase):
+    def test_pairwise_constraints(self):
         list_of_label_pairs = [("Class A", "Class B")]
         # 4 instances with size 3 label lists
         labels_mapping = {0: np.array([0, 1, 1]), 1: np.array([0, 0, 1]), 2: np.array([1, 1, 0]), 3: np.array([1, 1, 0])}
@@ -32,31 +34,52 @@ class ConstraintsTest(unittest.TestCase):
         self.assertEqual(test_constraints, set([(0, 1), (1, 2), (1, 3)]))
 
 
-class PatternEnumTest(unittest.TestCase):
-    def test(self):
+class PatternEnumTest(GspanTestCase):
+    def test_basic_enum(self):
         # 5 graphs, 0-4 positive, 5 is a negative
         min_support = 1
-        n_graphs = len(graphs)
+        n_graphs = len(self.graphs)
         n_patterns = 3
-        pos_index = range(0, n_graphs)
+        pos_index = range(0, n_graphs-1)
         n_pos = len(pos_index)
         n_neg = n_graphs - n_pos
-        neg_index = [n_graphs]
+        neg_index = [n_graphs-1]
         # identity dictionary
-        graph_id_to_list = dict(zip(range(0, n_graphs + 1), range(0, n_graphs + 1)))
+        graph_id_to_list = dict(zip(range(0, n_graphs), range(0, n_graphs)))
         # labels of nodes and edges (types)
         mapper = {0: "Node 1", 1: "Node 2", 2: "Node 3", 11: "Edge a", 12: "Edge b"}
         labels = {0: "Class A", 1: "Class B"}
         pattern_scoring_model = "top-k"
         # Must-link and Cannot-Link Constraints (both empty)
         instance_constraints = ([], [])
-        instance_hits, patterns = gspan.project(graphs, [], min_support, [], n_patterns, None, None, None, n_graphs,
+        instance_hits, patterns = gspan.project(self.graphs, [], min_support, [], n_patterns, None, None, None, n_graphs,
                                                 n_pos, n_neg, pos_index, 0, neg_index, graph_id_to_list, mapper, labels,
                                                 pattern_scoring_model, instance_constraints)
         X = np.array(instance_hits).transpose()
         self.assertEqual(X.shape, (n_graphs, n_patterns))
 
 
-class BranchAndBoundTest(unittest.TestCase):
-    def test(self):
-        pass
+class BranchAndBoundTest(GspanTestCase):
+    def test_greedy(self):
+        min_support = 1
+        n_graphs = len(self.graphs)
+        n_patterns = 3
+        pos_index = range(0, n_graphs-1)
+        n_pos = len(pos_index)
+        n_neg = n_graphs - n_pos
+        neg_index = [n_graphs-1]
+        # identity dictionary
+        graph_id_to_list = dict(zip(range(0, n_graphs), range(0, n_graphs)))
+        # labels of nodes and edges (types)
+        mapper = {0: "Node 1", 1: "Node 2", 2: "Node 3", 11: "Edge a", 12: "Edge b"}
+        labels = {0: "Class A", 1: "Class B"}
+        pattern_scoring_model = "greedy"
+        # Must-link and Cannot-Link Constraints (both empty)
+        instance_constraints = ([], [])
+        instance_hits, patterns = gspan.project(self.graphs, [], min_support, [], n_patterns, None, None, None, n_graphs,
+                                                n_pos, n_neg, pos_index, 0, neg_index, graph_id_to_list, mapper, labels,
+                                                pattern_scoring_model, instance_constraints)
+        print instance_hits
+
+if __name__ == '__main__':
+    unittest.main()

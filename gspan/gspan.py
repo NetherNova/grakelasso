@@ -523,6 +523,7 @@ def project(database, frequent_nodes, minsup, freq_labels, length, H, L, L_hat, 
 	:param constraints:
 	:return:
 	"""
+	# Declaring globals for recursive pattern mining
 	global __subgraph_count
 	global __positive_index
 	global __n_pos
@@ -536,12 +537,22 @@ def project(database, frequent_nodes, minsup, freq_labels, length, H, L, L_hat, 
 	global __ml_constraints
 	global __negative_index
 	global __graph_id_to_list_id
-	global __neighbor_set
 
 	__graph_id_to_list_id = graph_id_to_list_id
-
 	__ml_constraints = [c for c in constraints[0] if c[0] < n_graphs and c[1] < n_graphs]
 	__cl_constraints = [c for c in constraints[1] if c[0] < n_graphs and c[1] < n_graphs]
+	__positive_index = pos_index
+	__negative_index = neg_index
+	__n_pos = n_pos
+	__n_graphs = n_graphs
+	__H = H
+	__L = L
+	__L_hat = L_hat
+	__dataset = []
+	__pattern_set = []
+	__subgraph_count = 0
+	dfs_codes = []
+	projection_map = {}
 
 	# TODO: evaluate
 	"""
@@ -554,6 +565,8 @@ def project(database, frequent_nodes, minsup, freq_labels, length, H, L, L_hat, 
 		if not labels[con[0]][class_index] == 1 and not labels[con[1]][class_index] == 1:
 			__cl_constraints.remove((con[0], con[1]))
 	"""
+
+	# clean constraints from not applicable ones
 	for i, con in enumerate(__ml_constraints):
 		if con[0] >= n_graphs or con[1] >= n_graphs:
 			__ml_constraints.remove(con)
@@ -576,32 +589,18 @@ def project(database, frequent_nodes, minsup, freq_labels, length, H, L, L_hat, 
 		except KeyError:
 			__cl_constraints.remove(con)
 
-	__positive_index = pos_index
-	__negative_index = neg_index
-	__n_pos = n_pos
-	__n_graphs = n_graphs
-	__H = H
-	__L = L
-	__L_hat = L_hat
-	__dataset = []
-	__pattern_set = []
-	__subgraph_count = 0
-	dfs_codes = []
-	projection_map = {}
-
+	# TODO: Is this needed?
 	for l in frequent_nodes:
 		__subgraph_count += 1		
 
 	for g in database:
 		for n in g.nodes:
-			#edges = []
 			edges = get_forward_init(n, g)
 			if len(edges) > 0:
 				 for e in edges:
 					nf = g.nodes[e.fromn]
 					nt = g.nodes[e.to]
 					dfsc = dfs_code(0,1,nf.label,e.label,nt.label)
-
 					pdfs = pre_dfs(g.id,e,None)
 					# because this is a root --> append the predecesspr dfs code (graph id, edge, None)
 					if dfsc in projection_map:
@@ -610,19 +609,14 @@ def project(database, frequent_nodes, minsup, freq_labels, length, H, L, L_hat, 
 						projection_map[dfsc] = [pdfs,]
 
 	# Start Subgraph Mining
+	threshold = 0 	# initial threshold for first length 1 subgraph
 	for pm in reversed(sorted(projection_map, key=dfs_code_compare)):	# sorted by highest fromnode label (order is important)
-		# print pm
-		# Partial pruning like apriori
-		if len(projection_map[pm]) < minsup: # number of graphs, this initial pattern occurs
+		if len(projection_map[pm]) < minsup: # number of graphs, this initial pattern occurs (root patterns)
 			continue
-		
 		dfs_codes.append(dfs_code(0,1,pm[2],pm[3],pm[4]))	# initial pattern for this projection is always local 0, 1)
-
-		dfs_codes = mine_subgraph(database, projection_map[pm], 
-							dfs_codes, minsup, length, 0, mapper, model)
-
+		dfs_codes, threshold = mine_subgraph(database, projection_map[pm],
+							dfs_codes, minsup, length, threshold, mapper, model)
 		dfs_codes.pop()	# dfs_codes is a list of all projections for this initial pattern
-
 	return __dataset, __pattern_set
 
 
@@ -639,6 +633,7 @@ def mine_subgraph(database, projection, dfs_codes, minsup, length, threshold, ma
 	:param model:
 	:return:
 	"""
+	# test scores for this pattern *projection*
 	nsupport = count_support(projection)
 	if nsupport < minsup:
 		return dfs_codes
@@ -657,15 +652,15 @@ def mine_subgraph(database, projection, dfs_codes, minsup, length, threshold, ma
 
 	for pm in sorted(pm_backward, key=dfs_code_backward_compare):
 		dfs_codes.append(pm)
-		dfs_codes = mine_subgraph(database, pm_backward[pm], dfs_codes, minsup, length, threshold, mapper, model)
+		dfs_codes, threshold = mine_subgraph(database, pm_backward[pm], dfs_codes, minsup, length, threshold, mapper, model)
 		dfs_codes.pop()
 
 	for pm in reversed(sorted(pm_forward, key=dfs_code_forward_compare)):
 		dfs_codes.append(pm)
-		dfs_codes = mine_subgraph(database, pm_forward[pm], dfs_codes, minsup, length, threshold, mapper, model)
+		dfs_codes, threshold = mine_subgraph(database, pm_forward[pm], dfs_codes, minsup, length, threshold, mapper, model)
 		dfs_codes.pop()
 
-	return dfs_codes
+	return dfs_codes, threshold
 
 def q(vector, hat=False):
 	"""
@@ -731,6 +726,7 @@ def greedy_value(vector):
 	global __n_pos
 	global __negative_index
 
+	# TODO: Replace with information gain
 	hits_pos = sum(vector[__positive_index])
 	mis_pos = (__n_pos - hits_pos)
 	hits_neg = sum(vector[__negative_index])
@@ -818,24 +814,29 @@ def evaluate_and_prune(dfs_codes, mapper, projection, threshold, max_length, mod
 	add_eval = 0
 	prune_eval = 0
 	min_index = 0
-	threshold = 0
 	if model == "gMGFL":
 		add_eval, _ = q(vector)
 		prune_eval = q(vector, hat=True)
+		min_function = q
 		min_index, threshold  = get_min(q)
 
 	elif model == "top-k":
 		add_eval = prune_eval = count_support(projection)
-		min_index, threshold  = get_min(sum)
+		min_function = sum
+		#min_index, threshold  = get_min(sum)
 
 	elif model == "greedy":
-		add_eval = prune_eval = greedy_value(vector)
-		min_index, threshold  = get_min(greedy_value)
+		#Change to Information Gain
+		#add_eval = prune_eval = greedy_value(vector)
+		#min_index, threshold  = get_min(greedy_value)
+		add_eval = prune_eval = information_gain(vector)
+		min_function = information_gain # TODO: cannot prune based on IG simply (add IG upper bound functionality)
+		pass
 
 	elif model == "gMLC":
 		add_eval = gmlc(vector)
 		prune_eval = gmlc(vector, hat=True)
-		min_index, threshold  = get_min(gmlc)
+		min_function = gmlc
 	else:
 		logging.log(logging.ERROR, "Model %s not recognized" %(model))
 		exit(0)
@@ -843,10 +844,11 @@ def evaluate_and_prune(dfs_codes, mapper, projection, threshold, max_length, mod
 	if dataset_length < max_length or add_eval > threshold:
 		__dataset.append(vector)
 		__pattern_set.append(g)
+		min_index, threshold  = get_min(min_function)
 	if dataset_length > max_length:
 		__dataset.pop(min_index)
 		__pattern_set.pop(min_index)
-	if prune_eval <= threshold:
+	if prune_eval < threshold:
 		return True, threshold
 	return False, threshold
 
@@ -897,6 +899,7 @@ def database_to_matrix(database, pattern_set, mapper):
 				ret[i, j] = 1
 	return ret
 
+
 def database_statistics(database):
 	"""
 	Calculate average edge and nodes graph statistics
@@ -914,6 +917,26 @@ def database_statistics(database):
 		n_graphs += 1
 	avg_node = float(global_node_counter) / n_graphs
 	avg_edge = float(global_edge_counter) / n_graphs
-
 	return avg_node, avg_edge
 
+
+def information_gain_upper_bound(support):
+	pass
+
+
+def information_gain(vector):
+	global __positive_index
+	global __n_graphs
+	global __n_pos
+
+	hits_pos = sum(vector[__positive_index])
+	p = (1.0 * hits_pos) / __n_pos
+	p_global = (1.0 * __n_pos) / __n_graphs
+	return entropy(p_global) - entropy(p)
+
+
+def entropy(p):
+	if p == 0 or p == 1:
+		return 0
+	p_n = 1 - p
+	return -p * np.log2(p) - (p_n) * np.log2((p_n))

@@ -5,6 +5,7 @@ from rdflib import ConjunctiveGraph, URIRef, RDF, BNode, Literal
 import numpy as np
 import pickle
 import fileio
+import etl
 
 link = URIRef("http://pub.com#link")
 movie = URIRef("http://pub.com#movie")
@@ -15,6 +16,15 @@ plays = URIRef("http://pub.com#plays")
 
 restricted_label_list = ["Crime Fiction", "Mystery", "Horror", "Science Fiction", "Thriller", "Drama", "Romantic comedy",
                          "Romance Film", "Comedy", "Black comedy"]
+
+
+label_mappings_filename = "label_mappings.pickle"
+
+
+class MovieEtl(etl.Etl):
+    def __init__(self):
+        pass
+
 
 
 def extract_word_graphs(text_file, meta_file, out_path):
@@ -83,7 +93,7 @@ def extract_word_graphs(text_file, meta_file, out_path):
             label_mappings[inst_idx] = class_vector
             docs.append(text)
             inst_idx += 1
-    pickle.dump(label_mappings, open(out_path + "\\label_mappings.pickle", "w"))
+    pickle.dump(label_mappings, open(out_path + "\\" + label_mappings_filename, "w"))
     count_model = CountVectorizer(ngram_range=(1,1), min_df=5, stop_words="english", max_df=1500)
     count_model.fit(docs)
     #X = csr_matrix(count_model.fit_transform(docs))
@@ -161,7 +171,7 @@ def extract_actor_graph(character_file, meta_file, out_path):
                 g = actor_graph(m_id, attributes, start=True, graph=None)
             else:
                 g = actor_graph(m_id, attributes, start=False, graph=g)
-    pickle.dump(label_mappings, open(out_path + "\\label_mappings.pickle", "w"))
+    pickle.dump(label_mappings, open(out_path + "\\" + label_mappings_filename, "w"))
     return True
 
 
@@ -208,7 +218,7 @@ def convert_to_graph(words, index, count_model, path):
 
 
 def load_mappings(path):
-    label_mappings = pickle.load(open(path + "\\label_mappings.pickle", "r"))
+    label_mappings = pickle.load(open(path + "\\" + label_mappings_filename, "r"))
     num_classes = len(label_mappings[label_mappings.keys()[0]])
     num_instances = len(label_mappings)
     return label_mappings, num_classes, num_instances
@@ -256,7 +266,7 @@ def load_meta_data(path):
 
 
 def prepare_training_files(path, k_fold):
-    print("Extracting RDF from text...")
+    print "Extracting RDF from text..."
     unique_labels = extract_word_graphs(path + "\\plot_summaries.txt", path + "\\movie.metadata.tsv", path)
     labels_mapping, num_classes, num_instances = load_mappings(path)
     filelist = []
@@ -271,7 +281,7 @@ def prepare_training_files(path, k_fold):
     print "Dumped %s entity training and test files for %s folds" % (str(movie), str(k_fold))
 
 
-def load_training(path):
+def load_training_files(path):
     id_to_uri, graph_labels_train, graph_labels_test = load_meta_data(path)
     labels_mapping, num_classes, num_instances = load_mappings(path)
     unique_labels = load_labels(path)
