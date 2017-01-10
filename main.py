@@ -4,16 +4,22 @@ from learning.grakelasso import GraKeLasso, ModelManager
 import numpy as np
 from sklearn.feature_selection import f_regression
 from sklearn.linear_model import ElasticNet, Lasso, LinearRegression
+import csv
 
-"""Main script for processing time estimation and feature selection"""
+"""Main script for processing time estimation and feature selection - Lambda Grid Search"""
 if __name__ == '__main__':
     # *************** Parameters ************* #
     BASE_PATH = "D:/Dissertation/Data Sets/CycleTime-ISWC/"
-    np.random.seed(24)
-    lambda_range = [0, 1.0]
+    np.random.seed(1)
+    writer = csv.writer(open(BASE_PATH + "results_sparse.csv", "wb"), delimiter=",")
+    writer_full = csv.writer(open(BASE_PATH + "results_full.csv", "wb"), delimiter=",")
+    csv_header = ['Lambda', 'Lasso', 'Lasso Red', 'ElasticNet', 'ElasticNet Red', 'Graph', 'Graph Red', 'GraKe', 'GraKe Red']
+    writer_full.writerow(csv_header)
+    writer.writerow(csv_header)
+
+    lambda_range = [0.1, 1.1]   # inclusive 1.0
     n_fold = 10
     n_iter = 1000
-    alpha = 0.5
     p_val = 0.05
     num_examples_sparse = 40
     num_examples_big = 2000
@@ -57,143 +63,72 @@ if __name__ == '__main__':
     X_reg = X_all.ix[:, index_reg_reduced]
     num_features_reg = X_reg.shape[1]
 
-    #k_reg_reduced = k_full.ix[index_reg_reduced, index_reg_reduced]
     print("P-value reduced features: ", k_full.columns.values[index_reg_reduced])
 
-    # **************************** Full Data Set *************************** #
+    for alpha in np.arange(0.1, 2.1, 0.1):
+        # **************************** Full Data Set *************************** #
 
-    grake_lasso = GraKeLasso(k_full.as_matrix(), alpha)
-    glasso = GraKeLasso(dependency_graph_full.as_matrix(), alpha)
-    lasso = Lasso(alpha=alpha, fit_intercept=True, normalize=True, precompute='auto', copy_X=True,
-                  max_iter=n_iter, tol=1e-4, positive=False)
-    elasticNet = ElasticNet(alpha=alpha, l1_ratio=0.5, fit_intercept=True, normalize=True, precompute='auto',
-                            max_iter=n_iter, copy_X=True, tol=1e-4, positive=False)
-    # ols = LinearRegression(fit_intercept=True, normalize=True, copy_X=True)
-    lambda_glasso = glasso.cross_val_lambda(X_all, y_all, n_fold, n_iter, lambda_range, model=None)
-    lambda_grake_lasso = grake_lasso.cross_val_lambda(X_all, y_all, n_fold, n_iter, lambda_range, model=None)
-    lambda_elastic_net = grake_lasso.cross_val_lambda(X_all, y_all, n_fold, n_iter, lambda_range, model=elasticNet)
-    # lambda_lasso = grake_lasso.cross_val_lambda(X_all, y_all, n_fold, n_iter, lambda_range, model=lasso)
-    print("Full Data Set:")
-    print("Evaluating Lasso:")
-    lasso_full, lasso_full_red = grake_lasso.cross_val(X_all, y_all, n_fold, n_iter, 0, model=lasso)
-    print("Evaluating Elastic Net:")
-    eNet_full, eNet_full_red = grake_lasso.cross_val(X_all, y_all, n_fold, n_iter, lambda_elastic_net, model=elasticNet)
-    # print("Evaluating OLS:")
-    # ols_full, ols_full_red = grake_lasso.cross_val(X_all, y_all, n_fold, n_iter, 0.5, model=ols)
-    print("Evaluating GraKeLasso:")
-    grake_full, grake_full_red = grake_lasso.cross_val(X_all, y_all, n_fold, n_iter, lambda_grake_lasso, model=None)
-    print("Evaluating Glasso:")
-    glasso_full, glasso_full_red = glasso.cross_val(X_all, y_all, n_fold, n_iter, lambda_glasso, model=None)
-    print("---------------------------------------------------------------------------")
+        grake_lasso = GraKeLasso(k_full.as_matrix(), alpha)
+        glasso = GraKeLasso(dependency_graph_full.as_matrix(), alpha)
+        lasso = Lasso(alpha=alpha, fit_intercept=True, normalize=True, precompute='auto', copy_X=True,
+                      max_iter=n_iter, tol=1e-4, positive=False)
+        elasticNet = ElasticNet(alpha=alpha, l1_ratio=0.5, fit_intercept=True, normalize=True, precompute='auto',
+                                max_iter=n_iter, copy_X=True, tol=1e-4, positive=False)
+        lambda_glasso = glasso.cross_val_lambda(X_all, y_all, n_fold, n_iter, lambda_range, model=None)
+        lambda_grake_lasso = grake_lasso.cross_val_lambda(X_all, y_all, n_fold, n_iter, lambda_range, model=None)
+        lambda_elastic_net = grake_lasso.cross_val_lambda(X_all, y_all, n_fold, n_iter, lambda_range, model=elasticNet)
+        print("Full Data Set:")
+        print("Evaluating Lasso:")
+        lasso_full, lasso_full_red = grake_lasso.cross_val(X_all, y_all, n_fold, n_iter, 0, model=lasso)
+        print("Evaluating Elastic Net:")
+        eNet_full, eNet_full_red = grake_lasso.cross_val(X_all, y_all, n_fold, n_iter, lambda_elastic_net, model=elasticNet)
+        print("Evaluating GraKeLasso:")
+        grake_full, grake_full_red = grake_lasso.cross_val(X_all, y_all, n_fold, n_iter, lambda_grake_lasso, model=None)
+        print("Evaluating Glasso:")
+        glasso_full, glasso_full_red = glasso.cross_val(X_all, y_all, n_fold, n_iter, lambda_glasso, model=None)
+        print("---------------------------------------------------------------------------")
 
-    # **************************** Reg reduced performance *************************** #
+        # **************************** Reg reduced performance *************************** #
 
-    # TODO: reihenfolge von features im kernel und in den Daten gleich? Check!
-    # TODO: replace with actual Laplacian of reduced and full kernel - Check!
-    # TODO: Vergleich machen zwischen dependency network und kernel approach - Check!
-    # TODO: Calculate Overlap of reduction - Display Check!
 
-    # grake_lasso = KLasso(k_reg_reduced.as_matrix(), alpha)
-    # glasso = KLasso(dependency_graph_full.ix[index_reg_reduced, index_reg_reduced].as_matrix(), alpha)
-    # lasso = Lasso(alpha=alpha, fit_intercept=True, normalize=True, precompute='auto', copy_X=True,
-    #               max_iter=n_iter, tol=1e-4, positive=False)
-    # elasticNet = ElasticNet(alpha=alpha, l1_ratio=0, fit_intercept=True, normalize=True, precompute='auto',
-    #                         max_iter=n_iter, copy_X=True, tol=1e-4, positive=False)
-    # ols = LinearRegression(fit_intercept=True, normalize=True, copy_X=True)
-    # lambda_glasso = glasso.cross_val_lambda(X_reg, y_all, n_fold, n_iter, lambda_range, model=None)
-    # lambda_grake_lasso = grake_lasso.cross_val_lambda(X_reg, y_all, n_fold, n_iter, lambda_range, model=None)
-    # lambda_elastic_net = grake_lasso.cross_val_lambda(X_reg, y_all, n_fold, n_iter, lambda_range, model=elasticNet)
-    # lambda_lasso = grake_lasso.cross_val_lambda(X_reg, y_all, n_fold, n_iter, lambda_range, model=lasso)
-    # print("p-value reduction:")
-    # print("Evaluating Lasso:")
-    # lasso_p, lasso_p_red = grake_lasso.cross_val(X_reg, y_all, n_fold, n_iter, lambda_lasso, model=lasso)
-    # print("Evaluating Elastic Net:")
-    # eNet_p, eNet_p_red = grake_lasso.cross_val(X_reg, y_all, n_fold, n_iter, lambda_elastic_net, model=elasticNet)
-    # print("Evaluating OLS:")
-    # ols_p, ols_p_red = grake_lasso.cross_val(X_reg, y_all, n_fold, n_iter, 0.5, model=ols)
-    # print("Evaluating GraKeLasso:")
-    # grake_p, grake_p_red = grake_lasso.cross_val(X_reg, y_all, n_fold, n_iter, lambda_grake_lasso, model=None)
-    # print("Evaluating Glasso:")
-    # glasso_p, glasso_p_red = glasso.cross_val(X_reg, y_all, n_fold, n_iter, lambda_glasso, model=None)
-    # print("---------------------------------------------------------------------------")
 
-    # **************************** Sem reduced performance *************************** #
-    # grake_lasso = KLasso(k_sem_reduced.as_matrix(), alpha)
-    # glasso = KLasso(dependency_graph_sem_reduced.as_matrix(), alpha)
-    # lasso = Lasso(alpha=alpha, fit_intercept=True, normalize=True, precompute='auto', copy_X=True,
-    #               max_iter=n_iter, tol=1e-4, positive=False)
-    # elasticNet = ElasticNet(alpha=alpha, l1_ratio=0.5, fit_intercept=True, normalize=True, precompute='auto',
-    #                         max_iter=n_iter, copy_X=True, tol=1e-4, positive=False)
-    # ols = LinearRegression(fit_intercept=True, normalize=True, copy_X=True)
-    # lambda_glasso = glasso.cross_val_lambda(X_sem, y_all, n_fold, n_iter, lambda_range, model=None)
-    # lambda_grake_lasso = grake_lasso.cross_val_lambda(X_sem, y_all, n_fold, n_iter, lambda_range, model=None)
-    # lambda_elastic_net = grake_lasso.cross_val_lambda(X_sem, y_all, n_fold, n_iter, lambda_range, model=elasticNet)
-    # lambda_lasso = grake_lasso.cross_val_lambda(X_sem, y_all, n_fold, n_iter, lambda_range, model=lasso)
-    # print("Semantic reduction:")
-    # print("Evaluating Lasso:")
-    # lasso_sem, lasso_sem_red = grake_lasso.cross_val(X_sem, y_all, n_fold, n_iter, lambda_lasso, model=lasso)
-    # print("Evaluating Elastic Net:")
-    # eNet_sem, eNet_sem_red = grake_lasso.cross_val(X_sem, y_all, n_fold, n_iter, lambda_elastic_net, model=elasticNet)
-    # print("Evaluating OLS:")
-    # ols_sem, ols_sem_red = grake_lasso.cross_val(X_sem, y_all, n_fold, n_iter, 0.5, model=ols)
-    # print("Evaluating GraKeLasso:")
-    # grake_sem, grake_sem_red = grake_lasso.cross_val(X_sem, y_all, n_fold, n_iter, lambda_grake_lasso, model=None)
-    # print("Evaluating Glasso:")
-    # glasso_sem, glasso_sem_red = glasso.cross_val(X_sem, y_all, n_fold, n_iter, lambda_glasso, model=None)
-    # print("---------------------------------------------------------------------------")
+        # ******************************Sparse Data Set************************************ #
+        X_sparse = mm.get_all_features_except_response(response, index_sparse)
+        y_sparse = mm.get_data().ix[index_sparse, response]
+        mean_y_sparse = np.mean(y_sparse)
+        grake_lasso = GraKeLasso(k_full.as_matrix(), alpha)
+        glasso = GraKeLasso(dependency_graph_full.as_matrix(), alpha)
+        lasso = Lasso(alpha=alpha, fit_intercept=True, normalize=True, precompute='auto', copy_X=True,
+                      max_iter=n_iter, tol=1e-4, positive=False)
+        elasticNet = ElasticNet(alpha=alpha, l1_ratio=0.5, fit_intercept=True, normalize=True, precompute='auto',
+                                max_iter=n_iter, copy_X=True, tol=1e-4, positive=False)
+        lambda_glasso = glasso.cross_val_lambda(X_sparse, y_sparse, n_fold, n_iter, lambda_range, model=None)
+        lambda_grake_lasso = grake_lasso.cross_val_lambda(X_sparse, y_sparse, n_fold, n_iter, lambda_range, model=None)
+        lambda_elastic_net = grake_lasso.cross_val_lambda(X_sparse, y_sparse, n_fold, n_iter, lambda_range, model=elasticNet)
 
-    # ******************************Sparse Data Set************************************ #
-    X_sparse = mm.get_all_features_except_response(response, index_sparse)
-    y_sparse = mm.get_data().ix[index_sparse, response]
-    mean_y_sparse = np.mean(y_sparse)
-    grake_lasso = GraKeLasso(k_full.as_matrix(), alpha)
-    glasso = GraKeLasso(dependency_graph_full.as_matrix(), alpha)
-    lasso = Lasso(alpha=alpha, fit_intercept=True, normalize=True, precompute='auto', copy_X=True,
-                  max_iter=n_iter, tol=1e-4, positive=False)
-    elasticNet = ElasticNet(alpha=alpha, l1_ratio=0.5, fit_intercept=True, normalize=True, precompute='auto',
-                            max_iter=n_iter, copy_X=True, tol=1e-4, positive=False)
-    # ols = LinearRegression(fit_intercept=True, normalize=True, copy_X=True)
-    lambda_glasso = glasso.cross_val_lambda(X_sparse, y_sparse, n_fold, n_iter, lambda_range, model=None)
-    lambda_grake_lasso = grake_lasso.cross_val_lambda(X_sparse, y_sparse, n_fold, n_iter, lambda_range, model=None)
-    lambda_elastic_net = grake_lasso.cross_val_lambda(X_sparse, y_sparse, n_fold, n_iter, lambda_range, model=elasticNet)
-    # lambda_lasso = grake_lasso.cross_val_lambda(X_sparse, y_sparse, n_fold, n_iter, lambda_range, model=lasso)
-    print("Sparse data set (full features):")
-    print("Evaluating Lasso:")
-    lasso_sparse, lasso_sparse_red = grake_lasso.cross_val(X_sparse, y_sparse, n_fold, n_iter, 0, model=lasso)
-    print("Evaluating Elastic Net:")
-    eNet_sparse, eNet_sparse_red = grake_lasso.cross_val(X_sparse, y_sparse, n_fold, n_iter, lambda_elastic_net, model=elasticNet)
-    # print("Evaluating OLS:")
-    # ols_sparse, ols_sparse_red = grake_lasso.cross_val(X_sparse, y_sparse, n_fold, n_iter, 0.5, model=ols)
-    print("Evaluating GraKeLasso:")
-    grake_sparse, grake_sparse_red = grake_lasso.cross_val(X_sparse, y_sparse, n_fold, n_iter, lambda_grake_lasso, model=None)
-    print("Evaluating Glasso:")
-    glasso_sparse, glasso_sparse_red = glasso.cross_val(X_sparse, y_sparse, n_fold, n_iter, lambda_glasso, model=None)
-    print("---------------------------------------------------------------------------")
-    print("Full:")
-    print("Lasso: ", lasso_full / mean_y_all, lasso_full_red)
-    print("ENet: ", eNet_full / mean_y_all, eNet_full_red)
-    # print("OLS:, ", ols_full / mean_y_all, ols_full_red)
-    print("Grake, ", grake_full / mean_y_all, grake_full_red)
-    print("Glasso, ", glasso_full / mean_y_all, glasso_full_red)
-    # print("---------------------------------------------------------------------------")
-    # print("P-Value:")
-    # print("Lasso: ", lasso_p / mean_y_all, lasso_p_red)
-    # print("ENet: ", eNet_p / mean_y_all, eNet_p_red)
-    # print("OLS:, ", ols_p / mean_y_all, ols_p_red)
-    # print("Grake, ", grake_p / mean_y_all, grake_p_red)
-    # print("Glasso, ", glasso_p / mean_y_all, glasso_p_red)
-    # print("---------------------------------------------------------------------------")
-    # print("Semantic:")
-    # print("Lasso: ", lasso_sem / mean_y_all, lasso_sem_red)
-    # print("ENet: ", eNet_sem / mean_y_all, eNet_sem_red)
-    # print("OLS:, ", ols_sem / mean_y_all, ols_sem_red)
-    # print("Grake, ", grake_sem / mean_y_all, grake_sem_red)
-    # print("Glasso, ", glasso_sem / mean_y_all, glasso_sem_red)
-    print("---------------------------------------------------------------------------")
-    print("Sparse:")
-    print("Lasso: ", lasso_sparse / mean_y_sparse, lasso_sparse_red)
-    print("ENet: ", eNet_sparse / mean_y_sparse, eNet_sparse_red)
-    # print("OLS:, ", ols_sparse / mean_y_sparse, ols_sparse_red)
-    print("Grake, ", grake_sparse / mean_y_sparse, grake_sparse_red)
-    print("Glasso, ", glasso_sparse / mean_y_sparse, glasso_sparse_red)
-    print("---------------------------------------------------------------------------")
+        lasso_sparse, lasso_sparse_red = grake_lasso.cross_val(X_sparse, y_sparse, n_fold, n_iter, 0, model=lasso)
+        eNet_sparse, eNet_sparse_red = grake_lasso.cross_val(X_sparse, y_sparse, n_fold, n_iter, lambda_elastic_net, model=elasticNet)
+        grake_sparse, grake_sparse_red = grake_lasso.cross_val(X_sparse, y_sparse, n_fold, n_iter, lambda_grake_lasso, model=None)
+        glasso_sparse, glasso_sparse_red = glasso.cross_val(X_sparse, y_sparse, n_fold, n_iter, lambda_glasso, model=None)
+
+        print("Lambda: ", alpha)
+        print("---------------------------------------------------------------------------")
+        print("Full:")
+        print("Lasso: ", lasso_full / mean_y_all, lasso_full_red)
+        print("ENet: ", eNet_full / mean_y_all, eNet_full_red)
+        print("Glasso, ", glasso_full / mean_y_all, glasso_full_red)
+        print("Grake, ", grake_full / mean_y_all, grake_full_red)
+
+        writer_full.writerow([alpha, lasso_full / mean_y_all, lasso_full_red, eNet_full / mean_y_all, eNet_full_red,
+                              glasso_full / mean_y_all, glasso_full_red, grake_full / mean_y_all, grake_full_red])
+
+        print("---------------------------------------------------------------------------")
+        print("Sparse:")
+        print("Lasso: ", lasso_sparse / mean_y_sparse, lasso_sparse_red)
+        print("ENet: ", eNet_sparse / mean_y_sparse, eNet_sparse_red)
+        print("Glasso, ", glasso_sparse / mean_y_sparse, glasso_sparse_red)
+        print("Grake, ", grake_sparse / mean_y_sparse, grake_sparse_red)
+        print("---------------------------------------------------------------------------")
+
+        writer.writerow([alpha, lasso_sparse / mean_y_sparse, lasso_sparse_red, eNet_sparse / mean_y_sparse, eNet_sparse_red,
+                         glasso_sparse / mean_y_sparse, glasso_sparse_red, grake_sparse / mean_y_sparse, grake_sparse_red])

@@ -7,3 +7,4 @@ tests/prepare_MI.py
 tests/operations_simulation.py
 tests/instanceData.py
 tests/testClustering.py
+.gitignore
