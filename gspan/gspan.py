@@ -7,8 +7,9 @@ from rdflib import URIRef, ConjunctiveGraph, Literal
 import sys
 from sklearn.metrics.pairwise import pairwise_kernels
 import logging
+from scipy.stats import entropy
 
-logging.basicConfig(level=logging.WARNING)
+logging.basicConfig(level=logging.INFO)
 
 __subgraph_count = 0
 """
@@ -528,15 +529,14 @@ def project(database, frequent_nodes, minsup, freq_labels, length, H, L, L_hat, 
 	global __positive_index
 	global __n_pos
 	global __n_graphs
-	global __H
-	global __L
-	global __L_hat
 	global __dataset
 	global __pattern_set
 	global __cl_constraints
 	global __ml_constraints
 	global __negative_index
 	global __graph_id_to_list_id
+	global __min_threshold
+	global __min_index
 
 	__graph_id_to_list_id = graph_id_to_list_id
 	__ml_constraints = [c for c in constraints[0] if c[0] < n_graphs and c[1] < n_graphs]
@@ -551,8 +551,23 @@ def project(database, frequent_nodes, minsup, freq_labels, length, H, L, L_hat, 
 	__dataset = []
 	__pattern_set = []
 	__subgraph_count = 0
+	__min_threshold = sys.maxint
+	__min_index = 0
 	dfs_codes = []
 	projection_map = {}
+	feature_selection_model = None
+
+	if model == "top-k":
+		feature_selection_model = TopKModel()
+	elif model == "greedy":
+		feature_selection_model = GreedyModel(__n_graphs, __positive_index)
+	elif model == "gMGFL":
+		feature_selection_model = GMGFLModel(__L, __L_hat)
+	elif model == "gMLC":
+		feature_selection_model = GMLCModel(__L, __H)
+	else:
+		logging.log(logging.ERROR, "Model %s not recognized" %(model))
+		exit(0)
 
 	# TODO: evaluate
 	"""
@@ -614,13 +629,13 @@ def project(database, frequent_nodes, minsup, freq_labels, length, H, L, L_hat, 
 		if len(projection_map[pm]) < minsup: # number of graphs, this initial pattern occurs (root patterns)
 			continue
 		dfs_codes.append(dfs_code(0,1,pm[2],pm[3],pm[4]))	# initial pattern for this projection is always local 0, 1)
-		dfs_codes, threshold = mine_subgraph(database, projection_map[pm],
-							dfs_codes, minsup, length, threshold, mapper, model)
+		dfs_codes = mine_subgraph(database, projection_map[pm],
+							dfs_codes, minsup, length, mapper, feature_selection_model)
 		dfs_codes.pop()	# dfs_codes is a list of all projections for this initial pattern
 	return __dataset, __pattern_set
 
 
-def mine_subgraph(database, projection, dfs_codes, minsup, length, threshold, mapper, model):
+def mine_subgraph(database, projection, dfs_codes, minsup, length, mapper, feature_selection_model):
 	"""
 	recursive subgraph mining routine
 	:param database:
@@ -633,13 +648,13 @@ def mine_subgraph(database, projection, dfs_codes, minsup, length, threshold, ma
 	:param model:
 	:return:
 	"""
-	# test scores for this pattern *projection*
+	# test min_support for this pattern *projection*
 	nsupport = count_support(projection)
 	if nsupport < minsup:
 		return dfs_codes
 	if not is_min(dfs_codes):
 		return dfs_codes
-	stopping, threshold = evaluate_and_prune(dfs_codes, mapper, projection, threshold, length, model)
+	stopping = evaluate_and_prune(dfs_codes, mapper, projection, length, feature_selection_model)
 	if stopping:
 		return dfs_codes
 
@@ -652,34 +667,16 @@ def mine_subgraph(database, projection, dfs_codes, minsup, length, threshold, ma
 
 	for pm in sorted(pm_backward, key=dfs_code_backward_compare):
 		dfs_codes.append(pm)
-		dfs_codes, threshold = mine_subgraph(database, pm_backward[pm], dfs_codes, minsup, length, threshold, mapper, model)
+		dfs_codes = mine_subgraph(database, pm_backward[pm], dfs_codes, minsup, length, mapper, feature_selection_model)
 		dfs_codes.pop()
 
 	for pm in reversed(sorted(pm_forward, key=dfs_code_forward_compare)):
 		dfs_codes.append(pm)
-		dfs_codes, threshold = mine_subgraph(database, pm_forward[pm], dfs_codes, minsup, length, threshold, mapper, model)
+		dfs_codes = mine_subgraph(database, pm_forward[pm], dfs_codes, minsup, length, mapper, feature_selection_model)
 		dfs_codes.pop()
 
-	return dfs_codes, threshold
+	return dfs_codes
 
-def q(vector, hat=False):
-	"""
-	Scoring function of GMGFL
-	:param projection:
-	:return: quality function
-	"""
-	global __positive_index
-	global __n_pos
-	global __n_graphs
-	global __L
-	global __L_hat
-	global __dataset
-
-	if hat:
-		ret = vector.dot(__L_hat).dot(vector)
-	else:
-		ret = vector.dot(__L).dot(vector)
-	return ret, vector
 
 def projection_to_vector(projection):
 	"""
@@ -715,47 +712,6 @@ def get_min(fun):
 	return min_index, min_val
 
 
-def greedy_value(vector):
-	"""
-	Scoring function for greedy search
-	:param vector:
-	:return:
-	"""
-	global __positive_index
-	global __n_graphs
-	global __n_pos
-	global __negative_index
-
-	# TODO: Replace with information gain
-	hits_pos = sum(vector[__positive_index])
-	mis_pos = (__n_pos - hits_pos)
-	hits_neg = sum(vector[__negative_index])
-	mis_neg = (__n_graphs - __n_pos) - hits_neg
-	ret = -(mis_pos * mis_neg + hits_pos * hits_neg)
-	return ret
-
-
-def gmlc(vector, hat=False):
-	"""
-	Scoring function for GMLC
-	:param vector:
-	:param hat:
-	:return:
-	"""
-	global __dataset
-	global __H
-	global __L
-
-	M = __H.dot(__L).dot(__H)
-	M_hat = np.copy(M)
-	M_hat[M_hat < 0] = 0
-	if hat:
-		ret = vector.dot(M_hat).dot(vector)
-	else:
-		ret = vector.dot(M).dot(vector)
-	return ret
-
-
 def check_ml_constraints(vector):
 	"""
 	True - if one of the *__ml_constraints* is violated
@@ -770,6 +726,7 @@ def check_ml_constraints(vector):
 		if not (vector[con[0]] == vector[con[1]]):
 			return False
 	return True
+
 
 def check_cl_constraints(vector):
 	"""
@@ -786,7 +743,8 @@ def check_cl_constraints(vector):
 			return False
 	return True
 
-def evaluate_and_prune(dfs_codes, mapper, projection, threshold, max_length, model):
+
+def evaluate_and_prune(dfs_codes, mapper, projection, max_length, feature_selection_model):
 	"""
 	Apply scoring function of *model* to current pattern projection
 	:param dfs_codes:
@@ -799,58 +757,41 @@ def evaluate_and_prune(dfs_codes, mapper, projection, threshold, max_length, mod
 	"""
 	global __pattern_set
 	global __dataset
+	global __min_threshold
+	global __min_index
+
 	# subgraph pattern and vector representation
 	g = projection_to_graph(dfs_codes, mapper)
 	vector = projection_to_vector(projection)
-	# constraints checking!
+	# constraints checking
 	ml = check_ml_constraints(vector)
 	cl = check_cl_constraints(vector)
 	if not ml:
-		return True, threshold
+		# Must-Link stops search
+		return True
 	if not cl:
-		return False, threshold
+		# Cannot-Link only skips current pattern
+		return False
 
-	dataset_length = len(__dataset)
-	add_eval = 0
-	prune_eval = 0
-	min_index = 0
-	if model == "gMGFL":
-		add_eval, _ = q(vector)
-		prune_eval = q(vector, hat=True)
-		min_function = q
-		min_index, threshold  = get_min(q)
+	add_eval = feature_selection_model.score(vector)
+	prune_eval = feature_selection_model.upper_bound(vector)
+	logging.log(logging.DEBUG, "Score of %s: %s" %(g, add_eval))
+	logging.log(logging.DEBUG, "Upperbound of %s: %s" %(g, prune_eval))
 
-	elif model == "top-k":
-		add_eval = prune_eval = count_support(projection)
-		min_function = sum
-		#min_index, threshold  = get_min(sum)
-
-	elif model == "greedy":
-		#Change to Information Gain
-		#add_eval = prune_eval = greedy_value(vector)
-		#min_index, threshold  = get_min(greedy_value)
-		add_eval = prune_eval = information_gain(vector)
-		min_function = information_gain # TODO: cannot prune based on IG simply (add IG upper bound functionality)
-		pass
-
-	elif model == "gMLC":
-		add_eval = gmlc(vector)
-		prune_eval = gmlc(vector, hat=True)
-		min_function = gmlc
-	else:
-		logging.log(logging.ERROR, "Model %s not recognized" %(model))
-		exit(0)
 	# evaluate current pattern set
-	if dataset_length < max_length or add_eval > threshold:
+	if len(__dataset) < max_length or add_eval > __min_threshold:
 		__dataset.append(vector)
 		__pattern_set.append(g)
-		min_index, threshold  = get_min(min_function)
-	if dataset_length > max_length:
-		__dataset.pop(min_index)
-		__pattern_set.pop(min_index)
-	if prune_eval < threshold:
-		return True, threshold
-	return False, threshold
+		if add_eval < __min_threshold:
+			__min_threshold = add_eval
+			__min_index = len(__pattern_set) - 1
+	if len(__dataset) > max_length:
+		__dataset.pop(__min_index)
+		__pattern_set.pop(__min_index)
+		__min_index, __min_threshold  = get_min(feature_selection_model.score)
+	if prune_eval < __min_threshold:
+		return True
+	return False
 
 
 def projection_to_graph(dfs_codes, mapper):
@@ -920,23 +861,102 @@ def database_statistics(database):
 	return avg_node, avg_edge
 
 
-def information_gain_upper_bound(support):
-	pass
+class FeatureSelectionModel(object):
+	def __init__(self):
+		pass
+
+	def score(self, vector):
+		raise NotImplementedError( "Abstract Class" )
+
+	def upper_bound(self, vector):
+		raise NotImplementedError( "Abstract Class" )
 
 
-def information_gain(vector):
-	global __positive_index
-	global __n_graphs
-	global __n_pos
+class GMLCModel(FeatureSelectionModel):
+	def __init__(self, L, H):
+		self.L = L
+		self.H = H
+		self.M = self.H.dot(self.L).dot(self.H)
+		self.M_hat = np.copy(self.M)
+		self.M_hat[self.M_hat < 0] = 0
 
-	hits_pos = sum(vector[__positive_index])
-	p = (1.0 * hits_pos) / __n_pos
-	p_global = (1.0 * __n_pos) / __n_graphs
-	return entropy(p_global) - entropy(p)
+	def score(self, vector):
+		return vector.dot(self.M).dot(vector)
+
+	def upper_bound(self, vector):
+		return vector.dot(self.M_hat).dot(vector)
 
 
-def entropy(p):
-	if p == 0 or p == 1:
-		return 0
-	p_n = 1 - p
-	return -p * np.log2(p) - (p_n) * np.log2((p_n))
+class GMGFLModel(FeatureSelectionModel):
+	def __init__(self, L, L_hat):
+		self.L = L
+		self.L_hat = L_hat
+
+	def score(self, vector):
+		return vector.dot(self.L).dot(vector)
+
+	def upper_bound(self, vector):
+		return vector.dot(self.L_hat).dot(vector)
+
+
+class TopKModel(FeatureSelectionModel):
+	def __init__(self):
+		pass
+
+	def score(self, vector):
+		return sum(vector)
+
+	def upper_bound(self, vector):
+		return self.score(vector)
+
+
+class GreedyModel(FeatureSelectionModel):
+	def __init__(self, n_graphs, positive_index):
+		self.n_graphs = n_graphs
+		self.positive_index = positive_index
+		self.n_pos = len(positive_index)
+		self.p_c = (1.0 * self.n_pos) / self.n_graphs
+		self.entropy_class = entropy([self.p_c, 1-self.p_c], base=2)
+
+	def score(self, vector):
+		n_hits = sum(vector)
+		hits_pos = sum(vector[self.positive_index])
+		p_hits = (1.0 * n_hits) / self.n_graphs
+		p_pos_hits = (1.0 * hits_pos) / n_hits
+		return self.entropy_class - (self.conditional_entropy(self.p_c, p_hits, p_pos_hits))
+
+	def upper_bound(self, vector):
+		n_hits = sum(vector)
+		p_hits = (1.0 * n_hits) / self.n_graphs
+		result = 0
+		if p_hits <= self.p_c:
+			q_1 = self.conditional_entropy(self.p_c, p_hits, 1.0)
+			q_0 = self.conditional_entropy(self.p_c, p_hits, 0.0)
+			if np.isnan(q_1) or np.isnan(q_0):
+				return self.entropy_class
+			# if both are valid
+			if q_1 <= q_0:
+				result = q_1
+			else:
+				result = q_0
+		else:
+			q_pphits1 = self.conditional_entropy(self.p_c, p_hits, (1.0 * self.p_c) / p_hits)
+			q_pphits2 = self.conditional_entropy(self.p_c, p_hits, 1.0 - ((1.0 - self.p_c) / p_hits))
+			if q_pphits1 <= q_pphits2:
+				result = q_pphits1
+			else:
+				result = q_pphits2
+		return self.entropy_class - result
+
+	@staticmethod
+	def conditional_entropy(p_c, p_hits, q):
+		p_pos_hits = q
+		p_neg_hits = 1 - q
+		if p_hits == 1.0:
+			p_pos_mis = 0
+			p_neg_mis = 0
+		else:
+			p_pos_mis = (p_c - p_pos_hits * p_hits) / (1 - p_hits)
+			p_neg_mis = 1 - p_pos_mis
+		return (p_hits * entropy([p_pos_hits, p_neg_hits], base=2)
+									 + (1-p_hits) * entropy([p_pos_mis, p_neg_mis], base=2))

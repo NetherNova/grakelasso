@@ -406,6 +406,8 @@ def preprocessing(database_train, class_index, labels_mapping, model):
 		L = pairwise_kernels(W, metric="linear")
 	elif model == "top-k":
 		return H, L, L_hat, n_graphs, n_pos, n_neg, pos_index, neg_index, graph_id_to_list_id
+	elif model == "greedy":
+		return H, L, L_hat, n_graphs, n_pos, n_neg, pos_index, neg_index, graph_id_to_list_id
 	else:
 		W = np.zeros((n_graphs, n_graphs))
 		A = 0

@@ -177,7 +177,6 @@ if __name__ == '__main__':
 
     watcher = mp.Process(target=result_write_listener, args=(path, q))
     watcher.start()
-    jobs = []
 
     c1 = svm.SVC()
     c2 = GaussianNB()
@@ -188,12 +187,14 @@ if __name__ == '__main__':
     models = ["top-k", "greedy", "gMGFL"]
     cons = ([], [])
     min_sup = 0.02
-    max_p_num = 1000
-    for model in models:
-        p = mp.Process(target=run_model_experiment, args=(path, model, cons, k_fold, min_sup, clfs, names, max_p_num, q,))
-        jobs.append(p)
-        p.start()
-    # collect results
-    for job in jobs:
-        job.join()
+    max_p_num = [5, 10, 15]
+    for pattern_num in max_p_num:
+        jobs = []
+        for model in models:
+            p = mp.Process(target=run_model_experiment, args=(path, model, cons, k_fold, min_sup, clfs, names, pattern_num, q,))
+            jobs.append(p)
+            p.start()
+        # collect results
+        for job in jobs:
+            job.join()
     q.put("kill")
