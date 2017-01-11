@@ -6,7 +6,6 @@ from rdflib import ConjunctiveGraph, URIRef, RDF, BNode
 import numpy as np
 from collections import defaultdict
 from sklearn import cross_validation
-from simulation import ID
 from sklearn.metrics.pairwise import pairwise_kernels
 import logging
 
@@ -93,7 +92,8 @@ global relation_counter
 
 def create_graph(filelist, output_train, output_test, pos_graphs, cv, predicate, ob):
 	"""
-
+	Creates simple graphs in *.txt* format split into *cv* chunks,
+	*predicate* and *ob* specifiy what is the root for each simple graph in each rdf document
 	:param filelist:
 	:param output_train:
 	:param output_test:
@@ -152,7 +152,7 @@ def create_graph(filelist, output_train, output_test, pos_graphs, cv, predicate,
 				test = False
 				graph_labels_list_tmp = graph_labels_test
 			for f in filelist_tmp:
-				num = int(f.split("_")[1])
+				num = int(f.split("_")[1])	# assumes filename_i.rdf
 				labels = pos_graphs[num]
 				graph_labels_tmp.append(labels)
 				g = ConjunctiveGraph()
@@ -167,7 +167,6 @@ def create_graph(filelist, output_train, output_test, pos_graphs, cv, predicate,
 					local_entity_counter = 0
 					local_entity_map = dict()
 					dfs_triples(entity_set, entity_map, edge_set, relation_map, g, o)
-					#id = list(g.objects(o, ID))[0]
 					tf.write("t")
 					tf.write("\n")
 					for (local_id, global_id) in sorted(entity_set, key=lambda x: x[0]):

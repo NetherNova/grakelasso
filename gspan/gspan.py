@@ -1,4 +1,3 @@
-
 import graph
 import functools
 import collections

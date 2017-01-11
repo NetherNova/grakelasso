@@ -60,7 +60,7 @@ def run_model_experiment(path, model, cons, k_fold, min_sup, clfs, names, max_pa
     :return:
     """
     print "Running experiment %s..." % (model)
-    mapper, train_labels_all, test_labels_all, unique_labels, label_uris, labels_mapping, num_classes = \
+    mapper, train_labels_all, test_labels_all, labels_mapping, num_classes = \
         load_training_files(path)
     scores_combined = dict()
     times = []
@@ -173,7 +173,6 @@ if __name__ == '__main__':
 
     manager = mp.Manager()
     q = manager.Queue()
-    # pool = mp.Pool(mp.cpu_count() - 1)
 
     watcher = mp.Process(target=result_write_listener, args=(path, q))
     watcher.start()
