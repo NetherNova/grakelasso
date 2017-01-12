@@ -90,14 +90,22 @@ class SimulationEtl(etl.Etl):
         output_file_train = self.path + "\\train"
         filelist = []
         for i in xrange(0, num_processes):
-            filelist.append(path + "\\execution_"+str(i)+"_.rdf")
+            filelist.append(self.path + "\\execution_"+str(i)+"_.rdf")
 
         id_to_uri, graph_labels_train, graph_labels_test = \
             fileio.create_graph(filelist, output_file_train, output_file_test, labels_mapping, k_fold, RDF.type, self.process_uri)
+        self.dump_meta_data(id_to_uri, graph_labels_train, graph_labels_test)
 
     def load_training_files(self):
-        pass
+        id_to_uri, graph_labels_train, graph_labels_test = self.load_meta_data()
+        labels_mapping, num_classes, num_instances = self.load_mappings()
+        return id_to_uri, graph_labels_train, graph_labels_test, labels_mapping, num_classes
 
+    def load_mappings(self):
+        label_mappings = pickle.load(open(self.path + "\\" + self.label_mappings_filename, "r"))
+        num_classes = len(label_mappings[label_mappings.keys()[0]])
+        num_instances = len(label_mappings)
+        return label_mappings, num_classes, num_instances
 
     def generate_process(self, id, num_classes):
         """
@@ -282,7 +290,7 @@ class SimulationEtl(etl.Etl):
         labels_mapping = dict()
         for i in xrange(0, num_processes):
             g, label = self.generate_process(i, num_classes)
-            rdffile = open(path + "\\execution_"+str(i)+"_.rdf", "w")
+            rdffile = open(self.path + "\\execution_"+str(i)+"_.rdf", "w")
             labels_mapping[i] = label
             g.serialize(rdffile)
         self.dump_pickle_file(labels_mapping, self.label_mappings_filename)

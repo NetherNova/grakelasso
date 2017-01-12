@@ -2,10 +2,21 @@ __author__ = 'martin'
 
 import numpy as np
 import logging
+import rdflib
 
 logging.basicConfig(level=logging.WARNING)
 
-# TODO: create constraints from (rdf)-graph
+
+def label_constraints_graph(graph, labels_mapping, label_uris):
+    """
+
+    :param graph:
+    :param labels_mapping:
+    :param label_uris:
+    :return:
+    """
+    #TODO: create constraints from (rdf)-graph
+    pass
 
 
 def map_label_pair_to_ids(label1, label2, label_uris):

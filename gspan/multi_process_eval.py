@@ -14,7 +14,8 @@ from sklearn.cross_validation import StratifiedShuffleSplit
 from sklearn.grid_search import GridSearchCV
 from rdflib import URIRef, RDF, ConjunctiveGraph
 from sklearn.multiclass import OneVsRestClassifier
-from movieetl import load_training_files, prepare_training_files
+from movieetl import MovieEtl
+from simulation import SimulationEtl
 from constraints import label_ml_cons_new, label_cl_cons, label_cl_cons_new
 import pickle
 import multiprocessing as mp
@@ -39,15 +40,15 @@ def result_write_listener(path, q):
         while True:
             m = q.get()
             if m == 'kill':
-                # kill the process
+                # kill the writer process
                 break
             writer.writerow(m)
 
 
-def run_model_experiment(path, model, cons, k_fold, min_sup, clfs, names, max_pattern_num, q):
+def run_model_experiment(etl, model, cons, k_fold, min_sup, clfs, names, max_pattern_num, q):
     """
     Run a full *k-fold* experiment with *model* and a list of classifiers *clfs*
-    :param path:
+    :param etl:
     :param model:
     :param cons:
     :param k_fold:
@@ -61,20 +62,20 @@ def run_model_experiment(path, model, cons, k_fold, min_sup, clfs, names, max_pa
     """
     print "Running experiment %s..." % (model)
     mapper, train_labels_all, test_labels_all, labels_mapping, num_classes = \
-        load_training_files(path)
+        etl.load_training_files()
     scores_combined = dict()
     times = []
     pattern_lengths = []
     average_method = "weighted"
     for k in xrange(k_fold):
         print "%s K-Fold: %s" % (model, k)
-        train_file = path + "\\train" + str(k) + ".txt"
-        test_file = path + "\\test" + str(k) + ".txt"
+        train_file = etl.path + "\\train" + str(k) + ".txt"
+        test_file = etl.path + "\\test" + str(k) + ".txt"
         database_train = fileio.read_file(train_file)
         print "%s Number Graphs Read: %s" % (model, len(database_train))
-        minsup = int((float(min_sup)*len(database_train)))
-        print "%s Minsup: %s" %(model, minsup)
-        database_train, freq, trimmed, flabels = gspan.trim_infrequent_nodes(database_train, minsup)
+        abs_minsup = int((float(min_sup)*len(database_train)))
+        print "%s Minsup: %s" %(model, abs_minsup)
+        database_train, freq, trimmed, flabels = gspan.trim_infrequent_nodes(database_train, abs_minsup)
         database_train = fileio.read_file(train_file, frequent=freq)
         train_labels = np.array(train_labels_all[k])
         if model != "top-k":
@@ -83,7 +84,7 @@ def run_model_experiment(path, model, cons, k_fold, min_sup, clfs, names, max_pa
                 H, L, L_hat, n_graphs, n_pos, n_neg, pos_index, neg_index, graph_id_to_list_id = \
                     fileio.preprocessing(database_train, class_index, labels_mapping, model)
                 tik = datetime.utcnow()
-                X_train, pattern_set = gspan.project(database_train, freq, minsup, flabels, max_pattern_num, H, L, L_hat,
+                X_train, pattern_set = gspan.project(database_train, freq, abs_minsup, flabels, max_pattern_num, H, L, L_hat,
                                                  n_graphs, n_pos, n_neg, pos_index, class_index, neg_index,
                                                  graph_id_to_list_id, mapper=mapper, labels=labels_mapping, model=model,
                                                  constraints=cons)
@@ -107,9 +108,10 @@ def run_model_experiment(path, model, cons, k_fold, min_sup, clfs, names, max_pa
         else:
                 # special case top-k
                 class_index = 0
-                H, L, L_hat, n_graphs, n_pos, n_neg, pos_index, neg_index, graph_id_to_list_id = fileio.preprocessing(database_train, class_index, labels_mapping, model)
+                H, L, L_hat, n_graphs, n_pos, n_neg, pos_index, neg_index, graph_id_to_list_id = \
+                    fileio.preprocessing(database_train, class_index, labels_mapping, model)
                 tik = datetime.utcnow()
-                X_train, pattern_set = gspan.project(database_train, freq, minsup, flabels, max_pattern_num, H, L, L_hat,
+                X_train, pattern_set = gspan.project(database_train, freq, abs_minsup, flabels, max_pattern_num, H, L, L_hat,
                                                  n_graphs, n_pos, n_neg, pos_index, class_index, neg_index,
                                                  graph_id_to_list_id, mapper=mapper, labels=labels_mapping, model=model,
                                                  constraints=cons)
@@ -163,17 +165,19 @@ def evaluate_multilabel(train, train_labels, test, test_labels, clfs, names, ave
 
 
 if __name__ == '__main__':
-    path = "D:\\Dissertation\\Data Sets\\Movies\\MovieSummaries"
-    k_fold = 4
+    #path = "D:\\Dissertation\\Data Sets\\Movies\\MovieSummaries"
+    #etl = MovieEtl(path)
+    path = "D:\\Dissertation\\Data Sets\\Manufacturing"
+    etl = SimulationEtl(path)
+    k_fold = 5
 
+    # set True if ETL needs to run preparation first
     prepare = False
     if prepare:
-        prepare_training_files(path, k_fold)
-        exit(0)
+        etl.prepare_training_files(k_fold)
 
     manager = mp.Manager()
     q = manager.Queue()
-
     watcher = mp.Process(target=result_write_listener, args=(path, q))
     watcher.start()
 
@@ -190,7 +194,8 @@ if __name__ == '__main__':
     for pattern_num in max_p_num:
         jobs = []
         for model in models:
-            p = mp.Process(target=run_model_experiment, args=(path, model, cons, k_fold, min_sup, clfs, names, pattern_num, q,))
+            p = mp.Process(target=run_model_experiment,
+                           args=(etl, model, cons, k_fold, min_sup, clfs, names, pattern_num, q,))
             jobs.append(p)
             p.start()
         # collect results
