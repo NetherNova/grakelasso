@@ -76,12 +76,6 @@ class SimulationEtl(etl.Etl):
         self.op7 = URIRef("http://www.siemens.com/ontology/demonstrator#Operation/Finishing")
         self.process_uri = URIRef("http://www.siemens.com/ontology/demonstrator#Process")
 
-    def transform_labels_to_uris(self, unique_labels):
-        pass
-
-    def load_labels(self):
-        pass
-
     def prepare_training_files(self, k_fold):
         num_processes = 100
         num_classes = 6

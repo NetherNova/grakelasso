@@ -73,6 +73,7 @@ def read_file(filename, frequent=[]):
 
 			g.nodes[e.fromn].edges.append(e)
 			"""
+			# undirected graph
 			e2 = graph.Edge()
 			e2.fromn = e.to
 			e2.to = e.fromn

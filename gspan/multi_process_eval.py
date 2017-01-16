@@ -19,11 +19,21 @@ from simulation import SimulationEtl
 from constraints import label_ml_cons_new, label_cl_cons, label_cl_cons_new
 import pickle
 import multiprocessing as mp
+import ambergetl
 
 
 def merge_dicts(d1, d2, op=operator.concat):
     return dict(d1.items() + d2.items() + [(k, op(d1[k], d2[k])) for k in set(d1) & set(d2)])
 
+def parameter_search(clf, X, y):
+    C_range = np.logspace(-2, 3, 5)
+    gamma_range = np.logspace(-9, 2, 5)
+    param_grid = {'gamma': gamma_range, 'C': C_range}
+    grid = GridSearchCV(clf, param_grid)
+    grid.fit(X, y)
+    print "Best Parameters: %s" %(str(grid.best_params_))
+    print "Best Score: %s" %(str(grid.best_score_))
+    return grid.best_estimator_
 
 def result_write_listener(path, q):
     """
@@ -45,12 +55,12 @@ def result_write_listener(path, q):
             writer.writerow(m)
 
 
-def run_model_experiment(etl, model, cons, k_fold, min_sup, clfs, names, max_pattern_num, q):
+def run_model_experiment(etl, model, cons_index, k_fold, min_sup, clfs, names, max_pattern_num, q):
     """
     Run a full *k-fold* experiment with *model* and a list of classifiers *clfs*
     :param etl:
     :param model:
-    :param cons:
+    :param cons_index:
     :param k_fold:
     :param min_sup:
     :param clfs:
@@ -63,6 +73,7 @@ def run_model_experiment(etl, model, cons, k_fold, min_sup, clfs, names, max_pat
     print "Running experiment %s..." % (model)
     mapper, train_labels_all, test_labels_all, labels_mapping, num_classes = \
         etl.load_training_files()
+    cons = ([], []) #etl.get_constraints()
     scores_combined = dict()
     times = []
     pattern_lengths = []
@@ -82,11 +93,11 @@ def run_model_experiment(etl, model, cons, k_fold, min_sup, clfs, names, max_pat
             results = dict()
             for class_index in xrange(num_classes):
                 H, L, L_hat, n_graphs, n_pos, n_neg, pos_index, neg_index, graph_id_to_list_id = \
-                    fileio.preprocessing(database_train, class_index, labels_mapping, model)
+                    fileio.preprocessing(database_train, class_index, train_labels, model)
                 tik = datetime.utcnow()
                 X_train, pattern_set = gspan.project(database_train, freq, abs_minsup, flabels, max_pattern_num, H, L, L_hat,
                                                  n_graphs, n_pos, n_neg, pos_index, class_index, neg_index,
-                                                 graph_id_to_list_id, mapper=mapper, labels=labels_mapping, model=model,
+                                                 graph_id_to_list_id, mapper=mapper, labels=train_labels, model=model,
                                                  constraints=cons)
                 tok = datetime.utcnow()
                 times.append((tok - tik).total_seconds())
@@ -106,14 +117,14 @@ def run_model_experiment(etl, model, cons, k_fold, min_sup, clfs, names, max_pat
                 f1 = f1_score(test_labels, y_pred, average=average_method)
                 scores[names[x]].append(f1)
         else:
-                # special case top-k
+                # special case top-k class index is ignored
                 class_index = 0
                 H, L, L_hat, n_graphs, n_pos, n_neg, pos_index, neg_index, graph_id_to_list_id = \
-                    fileio.preprocessing(database_train, class_index, labels_mapping, model)
+                    fileio.preprocessing(database_train, class_index, train_labels, model)
                 tik = datetime.utcnow()
                 X_train, pattern_set = gspan.project(database_train, freq, abs_minsup, flabels, max_pattern_num, H, L, L_hat,
                                                  n_graphs, n_pos, n_neg, pos_index, class_index, neg_index,
-                                                 graph_id_to_list_id, mapper=mapper, labels=labels_mapping, model=model,
+                                                 graph_id_to_list_id, mapper=mapper, labels=train_labels, model=model,
                                                  constraints=cons)
                 tok = datetime.utcnow()
                 times.append((tok - tik).total_seconds())
@@ -128,7 +139,9 @@ def run_model_experiment(etl, model, cons, k_fold, min_sup, clfs, names, max_pat
         scores_combined = merge_dicts(scores, scores_combined)
     print "%s Scores: %s" % (model, scores_combined)
     for i in xrange(len(clfs)):
-        q.put([len(cons[0]), len(cons[1]), np.average(pattern_lengths), np.average(scores[names[i]]), model, np.average(times), names[i]])
+        avg_pattern_lengths = np.average(pattern_lengths)
+        avg_f1_score = np.average(scores_combined[names[i]])
+        q.put([len(cons[0]), len(cons[1]), avg_pattern_lengths, avg_f1_score ,model, np.average(times), names[i]])
     return True
 
 
@@ -165,11 +178,14 @@ def evaluate_multilabel(train, train_labels, test, test_labels, clfs, names, ave
 
 
 if __name__ == '__main__':
+    np.random.seed(24)
+    path = "D:\\Dissertation\\Data Sets\\Event Variant Amberg"
+    etl = ambergetl.AmbergEtl(path)
     #path = "D:\\Dissertation\\Data Sets\\Movies\\MovieSummaries"
-    #etl = MovieEtl(path)
-    path = "D:\\Dissertation\\Data Sets\\Manufacturing"
-    etl = SimulationEtl(path)
-    k_fold = 5
+    #MovieEtl(path)
+    #path = "D:\\Dissertation\\Data Sets\\Manufacturing"
+    #etl = SimulationEtl(path)
+    k_fold = 3
 
     # set True if ETL needs to run preparation first
     prepare = False
@@ -187,15 +203,14 @@ if __name__ == '__main__':
     clfs = [c1, c2, c3]
     names = ["Linear SVM", "Naive Bayes", "Nearest Neighbor"]
 
-    models = ["top-k", "greedy", "gMGFL"]
-    cons = ([], [])
+    models = ["top-k", "greedy"]
     min_sup = 0.02
-    max_p_num = [5, 10, 15]
+    max_p_num = [100]
     for pattern_num in max_p_num:
         jobs = []
         for model in models:
             p = mp.Process(target=run_model_experiment,
-                           args=(etl, model, cons, k_fold, min_sup, clfs, names, pattern_num, q,))
+                           args=(etl, model, 0, k_fold, min_sup, clfs, names, pattern_num, q,))
             jobs.append(p)
             p.start()
         # collect results

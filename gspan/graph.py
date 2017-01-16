@@ -33,7 +33,6 @@ class Graph():
 				edges.append(e)
 		for e in sorted(edges, key=lambda x: x.fromn):
 			ret += 'e %s %s %s\n' % (e.fromn, e.to, mapper[e.label])
-
 		print ret
 
 	def __repr__(self):
@@ -47,7 +46,19 @@ class Graph():
 				edges.append(e)
 		for e in sorted(edges, key=lambda x: x.fromn):
 			ret += 'e %d %d %d\n' % (e.fromn, e.to, e.label)
-
 		return ret
 
+
+	def graph_to_string_without_id(self):
+		edges = []
+		ret = 't #\n'
+		for n in sorted(self.nodes, key=lambda x: x.id):
+			ret += 'v %d %d\n' % (n.id, n.label)
+			for e in n.edges:
+				if e.id in [x.id for x in edges]:
+					continue
+				edges.append(e)
+		for e in sorted(edges, key=lambda x: x.fromn):
+			ret += 'e %d %d %d\n' % (e.fromn, e.to, e.label)
+		return ret
 

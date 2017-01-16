@@ -3,9 +3,9 @@ __author__ = 'martin'
 from sklearn.feature_extraction.text import CountVectorizer
 from rdflib import ConjunctiveGraph, URIRef, RDF, BNode, Literal
 import numpy as np
-import pickle
 import fileio
 import etl
+from constraints import label_cl_cons_new, label_ml_cons_new
 
 
 class MovieEtl(etl.Etl):
@@ -22,6 +22,19 @@ class MovieEtl(etl.Etl):
         self.plays = URIRef("http://pub.com#plays")
         self.restricted_label_list = ["Crime Fiction", "Mystery", "Horror", "Science Fiction", "Thriller", "Drama",
                                       "Romantic comedy", "Romance Film", "Comedy", "Black comedy"]
+        self.label_ml_pairs = [#("http://wordnet-rdf.princeton.edu/wn31/mystery-n", "http://wordnet-rdf.princeton.edu/wn31/horror-n"),
+                             #("http://wordnet-rdf.princeton.edu/wn31/thriller-n", "http://wordnet-rdf.princeton.edu/wn31/horror-n"),
+                             ("http://wordnet-rdf.princeton.edu/wn31/thriller-n", "http://wordnet-rdf.princeton.edu/wn31/crime+fiction-n"),
+                             ("http://wordnet-rdf.princeton.edu/wn31/mystery-n", "http://wordnet-rdf.princeton.edu/wn31/crime+fiction-n"),
+                             ("http://wordnet-rdf.princeton.edu/wn31/science+fiction-n", "http://wordnet-rdf.princeton.edu/wn31/crime+fiction-n"),
+                             #("http://wordnet-rdf.princeton.edu/wn31/science+fiction-n", "http://wordnet-rdf.princeton.edu/wn31/drama-n"),
+                             #("http://wordnet-rdf.princeton.edu/wn31/science+fiction-n", "http://wordnet-rdf.princeton.edu/wn31/horror-n"),
+                             ("http://wordnet-rdf.princeton.edu/wn31/science+fiction-n", "http://wordnet-rdf.princeton.edu/wn31/thriller-n"),
+                             ("http://wordnet-rdf.princeton.edu/wn31/science+fiction-n", "http://wordnet-rdf.princeton.edu/wn31/mystery-n"),
+                             ("http://wordnet-rdf.princeton.edu/wn31/comedy-n", "http://wordnet-rdf.princeton.edu/wn31/romantic+comedy-n"),
+                             ("http://wordnet-rdf.princeton.edu/wn31/comedy-n", "http://wordnet-rdf.princeton.edu/wn31/black+comedy-n"),
+                             #("http://wordnet-rdf.princeton.edu/wn31/drama-n", "http://wordnet-rdf.princeton.edu/wn31/romance+film-n"),
+                             ("http://wordnet-rdf.princeton.edu/wn31/romance+film-n", "http://wordnet-rdf.princeton.edu/wn31/romantic+comedy-n")]
 
     def prepare_training_files(self, k_fold):
         """
@@ -31,8 +44,8 @@ class MovieEtl(etl.Etl):
         :return:
         """
         print "Extracting RDF from text..."
-        unique_labels = self.extract_word_graphs()
-        labels_mapping, num_classes, num_instances = self.load_mappings()
+        unique_labels, label_mappings = self.extract_word_graphs()
+        num_instances = len(label_mappings)
         filelist = []
         print "Creating %s simple graphs..." % (str(num_instances))
         output_file_test = self.path + "\\test"
@@ -40,32 +53,23 @@ class MovieEtl(etl.Etl):
         for i in xrange(0, num_instances):
             filelist.append(self.path + "\\movie_"+str(i)+"_.rdf")
         id_to_uri, graph_labels_train, graph_labels_test = \
-            fileio.create_graph(filelist, output_file_train, output_file_test, labels_mapping, k_fold, RDF.type, self.movie)
-        self.dump_meta_data(id_to_uri, graph_labels_train, graph_labels_test)
+            fileio.create_graph(filelist, output_file_train, output_file_test, label_mappings, k_fold, RDF.type, self.movie)
+        self.dump_meta_data(id_to_uri, graph_labels_train, graph_labels_test, label_mappings, unique_labels)
         print "Dumped %s entity training and test files for %s folds" % (str(self.movie), str(k_fold))
 
     def load_training_files(self):
         """
         :param self.path:
-        :return: id_to_uri, graph_labels_train, graph_labels_test, unique_labels, label_uris, labels_mapping, num_classes
+        :return: id_to_uri, graph_labels_train, graph_labels_test, unique_labels, label_uris, label_mappings, num_classes
         """
-        id_to_uri, graph_labels_train, graph_labels_test = self.load_meta_data()
-        labels_mapping, num_classes, num_instances = self.load_mappings()
-        return id_to_uri, graph_labels_train, graph_labels_test, labels_mapping, num_classes
-
-    def load_labels(self):
-        return pickle.load(open(self.path + "\\" + self.unique_labels_filename, "r"))
-
-    def load_mappings(self):
-        label_mappings = pickle.load(open(self.path + "\\" + self.label_mappings_filename, "r"))
-        num_classes = len(label_mappings[label_mappings.keys()[0]])
-        num_instances = len(label_mappings)
-        return label_mappings, num_classes, num_instances
+        self.load_meta_data()
+        num_classes = len(self.label_mappings[self.label_mappings.keys()[0]])
+        return self.id_to_uri, self.graph_labels_train, self.graph_labels_test, self.label_mappings, num_classes
 
     def extract_word_graphs(self):
         min_document_freq = 5
         max_document_freq = 1500
-        max_lines = 1500
+        max_lines = 500
         genres_dict = dict()
         unique_labels = dict()
         label_counter = 0
@@ -130,14 +134,12 @@ class MovieEtl(etl.Etl):
                 label_mappings[inst_idx] = class_vector
                 docs.append(text)
                 inst_idx += 1
-        self.dump_pickle_file(label_mappings, self.label_mappings_filename)
         count_model = CountVectorizer(ngram_range=(1,1), min_df=min_document_freq, stop_words="english", max_df=max_document_freq)
         count_model.fit(docs)
         num_inst = len(docs)
         for i in xrange(num_inst):
             self.convert_to_graph(docs[i], i, count_model)
-        self.dump_pickle_file(unique_labels, self.unique_labels_filename)
-        return unique_labels
+        return unique_labels, label_mappings
 
     def extract_actor_graph(self):
         genres_dict = dict()
@@ -202,7 +204,7 @@ class MovieEtl(etl.Etl):
                     g = self.actor_graph(m_id, attributes, start=True, graph=None)
                 else:
                     g = self.actor_graph(m_id, attributes, start=False, graph=g)
-        pickle.dump(label_mappings, open(self.path + "\\" + self.label_mappings_filename, "w"))
+        return unique_labels, label_mappings
 
     def actor_graph(self, m_id, attributes, start=True, graph=None):
         if start:
@@ -242,11 +244,11 @@ class MovieEtl(etl.Etl):
                 prev_index = i
         g.serialize(self.path + "\\movie_" + str(index) + "_.rdf")
 
-    def transform_labels_to_uris(self, unique_labels):
-        label_uris = dict()
-        for k, v in unique_labels.items():
-            label_uris[v] = self.term_to_wordnet_uri(k)
-        return label_uris
+    def transform_labels_to_uris(self):
+        self.label_uris = dict()
+        for k, v in self.unique_labels.items():
+            self.label_uris[v] = self.term_to_wordnet_uri(k)
+        return self.label_uris
 
     def term_to_wordnet_uri(self, term):
         base_uri = "http://wordnet-rdf.princeton.edu/wn31/"
@@ -263,6 +265,14 @@ class MovieEtl(etl.Etl):
             return URIRef(temp_uri)
         else:
             return URIRef(base_uri + term.lower() + "-n")
+
+    def get_constraints(self):
+        self.transform_labels_to_uris()
+        ml_cons = label_ml_cons_new(self.label_ml_pairs, self.label_mappings, self.label_uris, 0.01)
+        ml_cons = list(ml_cons)
+        cl_cons = label_cl_cons_new(self.label_ml_pairs, self.label_mappings, self.label_uris, 0.01)
+        cl_cons = list(cl_cons)
+        return (ml_cons, cl_cons)
 
 
 if __name__ == '__main__':
