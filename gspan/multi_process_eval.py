@@ -44,7 +44,7 @@ def result_write_listener(path, q):
     """
     print "Writer process started..."
     now = datetime.now()
-    with open(path + "\\classifiers_movies" + now.strftime("%Y-%m-%d") + ".csv", "w") as f:
+    with open(path + "\\classification_results" + now.strftime("%Y-%m-%d") + ".csv", "w") as f:
         writer = csv.writer(f)
         writer.writerow(["num_ML_constraints", "num_CL_constraints", "num_features", "f1-score", "model", "runtime", "classifier"])
         while True:
@@ -110,6 +110,7 @@ def run_model_experiment(etl, model, cons_index, k_fold, min_sup, clfs, names, m
                 results_class = evaluate_binary_split(X_train, train_labels, X_test, clfs, names, class_index)
                 results = merge_dicts(results_class, results)
             print "%s Number of features: %s" % (model, np.average(pattern_lengths))
+            print(pattern_set)
             scores = dict()
             for x in xrange(len(names)):
                 scores[names[x]] = []
@@ -130,6 +131,7 @@ def run_model_experiment(etl, model, cons_index, k_fold, min_sup, clfs, names, m
                 times.append((tok - tik).total_seconds())
                 pattern_length = len(pattern_set)
                 print "%s Number of features: %s" % (model, pattern_length)
+                print(pattern_set)
                 pattern_lengths.append(pattern_length)
                 X_train = gspan.database_to_matrix(database_train, pattern_set, mapper)
                 database_test = fileio.read_file(test_file)

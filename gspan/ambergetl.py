@@ -34,13 +34,12 @@ class AmbergEtl(etl.Etl):
         table = table.set_index(pd.DatetimeIndex(table[self.timestamp]))
         table = table.sort_index()
         self.events_to_ids(table[self.message])
-        window_size_minutes = 5
+        window_size_minutes = 1
         # loop
         self.loop_through_events(table, window_size_minutes)
         # From list of graphs, create train and test data according to k_fold
         graph_labels_train, graph_labels_test = self.create_k_fold_split(k_fold)
         self.dump_meta_data(self.id_to_uri, graph_labels_train, graph_labels_test, self.label_mappings, self.event_to_id.keys())
-        pass
 
     def load_training_files(self):
         self.load_meta_data()
@@ -54,11 +53,13 @@ class AmbergEtl(etl.Etl):
             window_end = window_start + pd.DateOffset(minutes=window_size_minutes)
 
             window_table = table[window_start:window_end]
-            self.add_graph(window_table)
-            # take last value
-            predictions_start = window_end + pd.DateOffset(seconds=1)   # do not include current window_end
-            predictions_end = predictions_start + pd.DateOffset(minutes=window_size_minutes)
-            self.generate_predictions(table[predictions_start:predictions_end], i)
+            if len(self.graphs) < 300:
+                self.add_graph(window_table)
+                predictions_start = window_end + pd.DateOffset(seconds=1)   # do not include current window_end
+                predictions_end = predictions_start + pd.DateOffset(minutes=window_size_minutes)
+                self.generate_predictions(table[predictions_start:predictions_end], i)
+            else:
+                return
 
     def generate_predictions(self, window_table, i):
         labels = np.zeros(len(self.event_to_id))
