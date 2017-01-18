@@ -62,7 +62,7 @@ class AmbergEtl(etl.Etl):
                 return
 
     def generate_predictions(self, window_table, i):
-        labels = np.zeros(len(self.event_to_id))
+        labels = np.zeros(len(self.event_to_id), dtype=int)
         for j in xrange(window_table.shape[0]):
             row = window_table.iloc[j]
             label_index = self.event_to_id[row[self.message]]

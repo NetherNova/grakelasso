@@ -156,9 +156,12 @@ def evaluate_binary_split(train, train_labels, test, clfs, names, class_index):
     for i in xrange(len(names)):
         results[names[i]] = []
     for x, clf in enumerate(clfs):
-        clf.fit(train, train_labels[:, class_index])
-        y_pred = clf.predict(test)
-        results[names[x]].append(y_pred)
+        if len(np.unique(train_labels[:, class_index])) <= 1:
+            results[names[x]].append(np.zeros(train.shape[0]))
+        else:
+            clf.fit(train, train_labels[:, class_index])
+            y_pred = clf.predict(test)
+            results[names[x]].append(y_pred)
     return results
 
 
@@ -181,7 +184,7 @@ def evaluate_multilabel(train, train_labels, test, test_labels, clfs, names, ave
 
 if __name__ == '__main__':
     np.random.seed(24)
-    path = "D:\\Dissertation\\Data Sets\\Event Variant Amberg"
+    path = "C:\\Users\\martin\\Desktop\\Projekte\\Dissertation\\Datasets\\Amberg"
     etl = ambergetl.AmbergEtl(path)
     #path = "D:\\Dissertation\\Data Sets\\Movies\\MovieSummaries"
     #MovieEtl(path)
